@@ -1,0 +1,47 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+**Ptern** is a Gleam library (JavaScript target) that compiles a readable pattern language (called "pterns") into regular expressions via tagged template literals. The goal is to provide an alternative to regex that is far more readable while preserving the power of pattern matching, capturing, and metadata queries.
+
+The public API of a compiled ptern should include: `matches()`, `starts()`, `ends()`, `contained_in()`, `match()`, `max_length()`, `min_length()`.
+
+## Commands
+
+```sh
+gleam build          # Build the project
+gleam test           # Run all tests
+gleam run            # Run src/ptern.gleam main
+gleam check          # Type-check without building
+gleam add <package>  # Add a dependency
+```
+
+The project targets JavaScript only (`target = "javascript"` in `gleam.toml`) and runs on Bun.
+
+## Project Structure
+
+- `src/ptern.gleam` — library entry point
+- `test/ptern_test.gleam` — test entry point (uses gleeunit)
+- `gleam.toml` — project manifest, dependencies, and JavaScript target config
+- `build/` — generated output (gitignored)
+
+## Ptern Language
+
+The language has a defined grammar (see README.md for full syntax reference):
+
+- **Literals**: `'xyz'` or `"abc"` — literal text
+- **Character class range**: `'a'..'z'` — one character in the inclusive range
+- **Unicode/POSIX classes**: `%Digit`, `%Alpha`, `%Alnum`, `%L`, `%N`, `%Any`, etc.
+- **Sequence**: `<ptern1> <ptern2>` — space between is required (enforces readability)
+- **Alternatives**: `<ptern1> | <ptern2>`
+- **Fixed repetition**: `<ptern> * 3`
+- **Bounded repetition**: `<ptern> * 3..10`
+- **Grouping**: `( <ptern> )`
+- **Named capture**: `<ptern> as <identifier>`
+- **Set difference**: `%IDENTIFIER excluding <ptern>`
+- **Named subpattern definition**: `identifier = <ptern> ;`
+- **Subpattern interpolation**: `{ identifier }`
+
+Operator precedence (highest to lowest): `()`, `{}`, `..`, `excluding`, `*`, `as`, sequence (space), `|`, `=`
