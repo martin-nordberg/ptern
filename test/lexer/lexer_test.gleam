@@ -1,9 +1,10 @@
 import gleeunit/should
 import lexer/lexer
 import lexer/token.{
-  As, Asterisk, CharacterClass, Comment, DoubleQuotedLiteral, Equals, Excluding,
-  Identifier, Integer, LeftBrace, LeftParen, Pipe, RangeOperator, RightBrace,
-  RightParen, Semicolon, SingleQuotedLiteral, Whitespace,
+  As, At, Asterisk, CharacterClass, Comment, DoubleQuotedLiteral, Equals,
+  Excluding, FalseKeyword, Identifier, Integer, LeftBrace, LeftParen,
+  AlternativeOperator, QuestionMark, RangeOperator, RightBrace, RightParen,
+  Semicolon, SingleQuotedLiteral, TrueKeyword, Whitespace,
 }
 
 pub fn lex_empty_test() {
@@ -80,7 +81,7 @@ pub fn lex_operators_test() {
   |> should.equal(
     Ok([
       Asterisk,
-      Pipe,
+      AlternativeOperator,
       Equals,
       Semicolon,
       LeftBrace,
@@ -130,6 +131,26 @@ pub fn lex_repetition_expression_test() {
   )
 }
 
+pub fn lex_question_mark_test() {
+  lexer.lex("?")
+  |> should.equal(Ok([QuestionMark]))
+}
+
+pub fn lex_unbounded_repetition_test() {
+  lexer.lex("%Digit * 1..?")
+  |> should.equal(
+    Ok([
+      CharacterClass("Digit"),
+      Whitespace,
+      Asterisk,
+      Whitespace,
+      Integer(1),
+      RangeOperator,
+      QuestionMark,
+    ]),
+  )
+}
+
 pub fn lex_bounded_repetition_test() {
   lexer.lex("'*' * 3..10")
   |> should.equal(
@@ -176,7 +197,7 @@ pub fn lex_iso_date_pattern_test() {
       RangeOperator,
       SingleQuotedLiteral("9"),
       Whitespace,
-      Pipe,
+      AlternativeOperator,
       Whitespace,
       SingleQuotedLiteral("1"),
       Whitespace,
@@ -196,7 +217,7 @@ pub fn lex_iso_date_pattern_test() {
       RangeOperator,
       SingleQuotedLiteral("9"),
       Whitespace,
-      Pipe,
+      AlternativeOperator,
       Whitespace,
       SingleQuotedLiteral("1"),
       RangeOperator,
@@ -204,7 +225,7 @@ pub fn lex_iso_date_pattern_test() {
       Whitespace,
       CharacterClass("Digit"),
       Whitespace,
-      Pipe,
+      AlternativeOperator,
       Whitespace,
       SingleQuotedLiteral("3"),
       Whitespace,
@@ -270,9 +291,38 @@ pub fn lex_alternatives_test() {
     Ok([
       SingleQuotedLiteral("a"),
       Whitespace,
-      Pipe,
+      AlternativeOperator,
       Whitespace,
       SingleQuotedLiteral("b"),
+    ]),
+  )
+}
+
+pub fn lex_at_sign_test() {
+  lexer.lex("@")
+  |> should.equal(Ok([At]))
+}
+
+pub fn lex_true_keyword_test() {
+  lexer.lex("true")
+  |> should.equal(Ok([TrueKeyword]))
+}
+
+pub fn lex_false_keyword_test() {
+  lexer.lex("false")
+  |> should.equal(Ok([FalseKeyword]))
+}
+
+pub fn lex_annotation_test() {
+  lexer.lex("@case-insensitive = true")
+  |> should.equal(
+    Ok([
+      At,
+      Identifier("case-insensitive"),
+      Whitespace,
+      Equals,
+      Whitespace,
+      TrueKeyword,
     ]),
   )
 }

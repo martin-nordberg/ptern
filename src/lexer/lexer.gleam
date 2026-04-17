@@ -3,10 +3,11 @@ import gleam/list
 import gleam/result
 import gleam/string
 import lexer/token.{
-  type LexError, type Token, As, Asterisk, Backslash, CharacterClass, Comment,
-  DoubleQuotedLiteral, Equals, Excluding, Identifier, Integer, LeftBrace,
-  LeftParen, Pipe, RangeOperator, RightBrace, RightParen, Semicolon,
-  SingleQuotedLiteral, UnexpectedCharacter, UnterminatedString, Whitespace,
+  type LexError, type Token, As, At, Asterisk, CharacterClass, Comment,
+  DoubleQuotedLiteral, Equals, Excluding, FalseKeyword, Identifier, Integer,
+  LeftBrace, LeftParen, AlternativeOperator, QuestionMark, RangeOperator,
+  RightBrace, RightParen, Semicolon, SingleQuotedLiteral, TrueKeyword,
+  UnexpectedCharacter, UnterminatedString, Whitespace,
 }
 
 /// Lex a complete Ptern source string into a flat list of tokens.
@@ -37,10 +38,11 @@ fn do_lex(input: String, acc: List(Token)) -> Result(List(Token), LexError) {
         "\"" -> lex_double_quoted(rest, "", acc)
         "%" -> lex_character_class(rest, acc)
         "." -> lex_range_operator(rest, acc)
+        "@" -> do_lex(rest, [At, ..acc])
+        "?" -> do_lex(rest, [QuestionMark, ..acc])
         "*" -> do_lex(rest, [Asterisk, ..acc])
-        "|" -> do_lex(rest, [Pipe, ..acc])
+        "|" -> do_lex(rest, [AlternativeOperator, ..acc])
         "=" -> do_lex(rest, [Equals, ..acc])
-        "\\" -> do_lex(rest, [Backslash, ..acc])
         "{" -> do_lex(rest, [LeftBrace, ..acc])
         "}" -> do_lex(rest, [RightBrace, ..acc])
         "(" -> do_lex(rest, [LeftParen, ..acc])
@@ -194,8 +196,10 @@ fn lex_character_class(
   }
 }
 
-// Continues consuming lowercase letters after the initial uppercase letter
-// of a character class name, then emits the completed CharacterClass token.
+// Continues consuming letters after the initial uppercase letter of a
+// character class name, accepting both lowercase and uppercase (to support
+// PascalCase names such as `%LowercaseLetter`), then emits the completed
+// CharacterClass token.
 fn lex_character_class_rest(
   input: String,
   name: String,
@@ -203,7 +207,7 @@ fn lex_character_class_rest(
 ) -> Result(List(Token), LexError) {
   case string.pop_grapheme(input) {
     Ok(#(char, rest)) ->
-      case is_lower(char) {
+      case is_alpha(char) {
         True -> lex_character_class_rest(rest, name <> char, acc)
         False -> do_lex(input, [CharacterClass(name), ..acc])
       }
@@ -258,8 +262,8 @@ fn lex_identifier(
   }
 }
 
-// Checks whether the accumulated name is a keyword (`as`, `excluding`),
-// emits the appropriate token, and resumes the main loop.
+// Checks whether the accumulated name is a keyword (`as`, `excluding`,
+// `true`, `false`), emits the appropriate token, and resumes the main loop.
 fn finish_identifier(
   name: String,
   rest: String,
@@ -268,6 +272,8 @@ fn finish_identifier(
   let token = case name {
     "as" -> As
     "excluding" -> Excluding
+    "true" -> TrueKeyword
+    "false" -> FalseKeyword
     _ -> Identifier(name)
   }
   do_lex(rest, [token, ..acc])

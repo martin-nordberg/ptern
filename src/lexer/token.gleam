@@ -34,14 +34,11 @@ pub type Token {
   Asterisk
 
   /// The alternative operator `|`, e.g. `'a' | 'b'`.
-  Pipe
+  AlternativeOperator
 
   /// The assignment operator `=`, used in subpattern definitions:
   /// `yyyy = %Digit * 4;`
   Equals
-
-  /// A literal backslash `\`. Reserved as a set-difference operator.
-  Backslash
 
   /// `{` — opens a subpattern interpolation, e.g. `{yyyy}`.
   LeftBrace
@@ -64,6 +61,20 @@ pub type Token {
   /// The keyword `excluding`, used for set difference:
   /// `%Digit excluding '8'..'9'`.
   Excluding
+
+  /// The keyword `true`, used as an annotation value:
+  /// `@case-insensitive = true`.
+  TrueKeyword
+
+  /// The keyword `false`, used as an annotation value:
+  /// `@case-insensitive = false`.
+  FalseKeyword
+
+  /// `@` — introduces an annotation, e.g. `@case-insensitive = true`.
+  At
+
+  /// `?` — used as the upper bound of an unbounded repetition, e.g. `* 1..?`.
+  QuestionMark
 
   /// A user-defined name, e.g. a subpattern name like `yyyy` or `my-pattern`.
   /// Identifiers start with a letter and may contain letters, digits, and
