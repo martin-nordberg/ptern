@@ -201,7 +201,7 @@ fn validate_escape_char(
     Error(_) -> [InvalidEscapeSequence("\\"), ..acc]
     Ok(#(c, rest)) ->
       case c {
-        "n" | "t" | "r" | "'" | "\"" | "\\" ->
+        "n" | "t" | "r" | "a" | "f" | "v" | "'" | "\"" | "\\" ->
           do_validate_escapes(rest, acc)
         "u" ->
           // \uXXXX — lexer already ensured 4 hex digits exist; skip them.
