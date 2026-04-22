@@ -7,8 +7,8 @@ import gleam/option.{type Option}
 /// repetition → exclusion → range-item → atom.
 
 /// The top-level parsed document.
-pub type Ptern {
-  Ptern(
+pub type ParsedPtern {
+  ParsedPtern(
     annotations: List(Annotation),
     definitions: List(Definition),
     body: Expression,

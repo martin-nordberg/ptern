@@ -4,7 +4,7 @@ import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import parser/ast.{
-  type Capture, type Definition, type Exclusion, type Expression, type Ptern,
+  type Capture, type Definition, type Exclusion, type Expression, type ParsedPtern,
   type Repetition, type Sequence, Alternation, CharRange, Group, Interpolation,
   Sequence, SingleAtom,
 }
@@ -15,7 +15,7 @@ import semantic/error.{
 
 /// Run all name-resolution checks on a parsed Ptern, returning every error
 /// found. An empty list means all names are correctly defined and used.
-pub fn resolve(ptern: Ptern) -> List(SemanticError) {
+pub fn resolve(ptern: ParsedPtern) -> List(SemanticError) {
   // 1. Collect definition names; flag duplicates.
   let #(def_names, dup_def_errs) = collect_def_names(ptern.definitions)
 

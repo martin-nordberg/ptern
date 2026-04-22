@@ -12,6 +12,7 @@ import parser/ast.{
   Exact, Group, Interpolation, Literal, RepCount, Sequence, SingleAtom, Unbounded,
 }
 import parser/parser
+import regex
 import semantic/error.{type SemanticError}
 import semantic/resolver
 import semantic/validator
@@ -26,41 +27,95 @@ pub type CompileError {
   SemanticErrors(List(SemanticError))
 }
 
-pub type CompiledPattern {
-  CompiledPattern(
-    source: String,
-    flags: String,
-    min_length: Int,
-    max_length: Option(Int),
+pub opaque type Ptern {
+  Ptern(
+    full_re: regex.Regex,
+    starts_re: regex.Regex,
+    ends_re: regex.Regex,
+    contains_re: regex.Regex,
+    min_len: Int,
+    max_len: Option(Int),
   )
 }
 
 // ---------------------------------------------------------------------------
-// Compile: full pipeline
+// Compile
 // ---------------------------------------------------------------------------
 
-pub fn compile(source: String) -> Result(CompiledPattern, CompileError) {
+pub fn compile(source: String) -> Result(Ptern, CompileError) {
   use tokens <- result.try(lexer.lex(source) |> result.map_error(LexError))
-  use ptern <- result.try(parser.parse(tokens) |> result.map_error(ParseError))
+  use parsed <- result.try(parser.parse(tokens) |> result.map_error(ParseError))
   let semantic_errors =
-    list.append(validator.validate(ptern), resolver.resolve(ptern))
+    list.append(validator.validate(parsed), resolver.resolve(parsed))
   case semantic_errors {
     [_, ..] -> Error(SemanticErrors(semantic_errors))
     [] -> {
-      let compiled = codegen.compile(ptern)
-      let bounds = compute_ptern_bounds(ptern)
-      Ok(CompiledPattern(
-        source: compiled.source,
-        flags: compiled.flags,
-        min_length: bounds.min,
-        max_length: bounds.max,
+      let compiled = codegen.compile(parsed)
+      let bounds = compute_ptern_bounds(parsed)
+      let src = compiled.source
+      let flg = compiled.flags
+      Ok(Ptern(
+        full_re: regex.make("^(?:" <> src <> ")$", flg),
+        starts_re: regex.make("^(?:" <> src <> ")", flg),
+        ends_re: regex.make("(?:" <> src <> ")$", flg),
+        contains_re: regex.make(src, flg),
+        min_len: bounds.min,
+        max_len: bounds.max,
       ))
     }
   }
 }
 
 // ---------------------------------------------------------------------------
-// Length bounds
+// Matching
+// ---------------------------------------------------------------------------
+
+/// Returns `True` if the entire input matches this pattern.
+pub fn matches(ptern: Ptern, input: String) -> Bool {
+  regex.test_re(ptern.full_re, input)
+}
+
+/// Returns `True` if the input starts with this pattern.
+pub fn starts(ptern: Ptern, input: String) -> Bool {
+  regex.test_re(ptern.starts_re, input)
+}
+
+/// Returns `True` if the input ends with this pattern.
+pub fn ends(ptern: Ptern, input: String) -> Bool {
+  regex.test_re(ptern.ends_re, input)
+}
+
+/// Returns `True` if the pattern appears anywhere in the input.
+pub fn contained_in(ptern: Ptern, input: String) -> Bool {
+  regex.test_re(ptern.contains_re, input)
+}
+
+/// Returns the named captures from the first match, or `None` if no match.
+pub fn match(
+  ptern: Ptern,
+  input: String,
+) -> Option(Dict(String, String)) {
+  regex.exec(ptern.contains_re, input)
+  |> option.map(dict.from_list)
+}
+
+// ---------------------------------------------------------------------------
+// Metadata
+// ---------------------------------------------------------------------------
+
+/// Minimum number of characters this pattern can match.
+pub fn min_length(ptern: Ptern) -> Int {
+  ptern.min_len
+}
+
+/// Maximum number of characters this pattern can match,
+/// or `None` if the pattern is unbounded.
+pub fn max_length(ptern: Ptern) -> Option(Int) {
+  ptern.max_len
+}
+
+// ---------------------------------------------------------------------------
+// Length bounds (internal)
 // ---------------------------------------------------------------------------
 
 type Bounds {
@@ -88,9 +143,9 @@ fn mul_opt(a: Option(Int), n: Int) -> Option(Int) {
   }
 }
 
-fn compute_ptern_bounds(ptern: ast.Ptern) -> Bounds {
-  let def_bounds = compute_def_bounds_all(ptern.definitions)
-  compute_expression_bounds(ptern.body, def_bounds)
+fn compute_ptern_bounds(parsed: ast.ParsedPtern) -> Bounds {
+  let def_bounds = compute_def_bounds_all(parsed.definitions)
+  compute_expression_bounds(parsed.body, def_bounds)
 }
 
 fn compute_def_bounds_all(

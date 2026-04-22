@@ -3,7 +3,7 @@ import gleam/option.{None, Some}
 import gleam/string
 import parser/ast.{
   type Atom, type Capture, type Definition, type Exclusion, type Expression,
-  type Ptern, type RangeItem, type RepCount, type Repetition, type Sequence,
+  type ParsedPtern, type RangeItem, type RepCount, type Repetition, type Sequence,
   Alternation, CharClass, CharRange, Exact, Group, Interpolation, Literal,
   RepCount, Sequence, SingleAtom,
 }
@@ -15,7 +15,7 @@ import semantic/error.{
 
 /// Run all constraint checks on a parsed Ptern, returning every error found.
 /// An empty list means the pattern is structurally valid.
-pub fn validate(ptern: Ptern) -> List(SemanticError) {
+pub fn validate(ptern: ParsedPtern) -> List(SemanticError) {
   list.flatten([
     validate_annotations(ptern.annotations),
     validate_definitions(ptern.definitions),

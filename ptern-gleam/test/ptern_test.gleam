@@ -1,3 +1,4 @@
+import gleam/dict
 import gleam/list
 import gleam/option.{None, Some}
 import gleeunit
@@ -16,7 +17,7 @@ pub fn main() {
 // ---------------------------------------------------------------------------
 
 fn has_semantic_error(
-  result: Result(ptern.CompiledPattern, ptern.CompileError),
+  result: Result(ptern.Ptern, ptern.CompileError),
   expected: error.SemanticError,
 ) -> Bool {
   case result {
@@ -30,58 +31,134 @@ fn has_semantic_error(
 // ---------------------------------------------------------------------------
 
 pub fn compile_simple_literal_test() {
-  ptern.compile("'hello'")
-  |> should.be_ok
-}
-
-pub fn compile_returns_source_test() {
-  let assert Ok(p) = ptern.compile("'hello'")
-  p.source |> should.equal("hello")
-}
-
-pub fn compile_default_flags_test() {
-  let assert Ok(p) = ptern.compile("'hello'")
-  p.flags |> should.equal("v")
-}
-
-pub fn compile_case_insensitive_flag_test() {
-  let assert Ok(p) = ptern.compile("@case-insensitive = true\n'hello'")
-  p.flags |> should.equal("vi")
+  ptern.compile("'hello'") |> should.be_ok
 }
 
 pub fn compile_charclass_test() {
-  ptern.compile("%Digit")
-  |> should.be_ok
+  ptern.compile("%Digit") |> should.be_ok
 }
 
 pub fn compile_range_test() {
-  ptern.compile("'a'..'z'")
-  |> should.be_ok
+  ptern.compile("'a'..'z'") |> should.be_ok
 }
 
 pub fn compile_alternation_test() {
-  ptern.compile("'foo' | 'bar'")
-  |> should.be_ok
+  ptern.compile("'foo' | 'bar'") |> should.be_ok
 }
 
 pub fn compile_named_capture_test() {
-  ptern.compile("%Digit * 4 as year")
-  |> should.be_ok
+  ptern.compile("%Digit * 4 as year") |> should.be_ok
 }
 
 pub fn compile_definition_and_interpolation_test() {
-  ptern.compile("d = %Digit * 4; {d}")
-  |> should.be_ok
+  ptern.compile("d = %Digit * 4; {d}") |> should.be_ok
 }
 
 pub fn compile_valid_escape_sequences_test() {
-  ptern.compile("'\\n\\t\\r\\\\'")
-  |> should.be_ok
+  ptern.compile("'\\n\\t\\r\\\\'") |> should.be_ok
 }
 
-pub fn compile_excluding_charclass_test() {
-  ptern.compile("'a'..'z' excluding 'q'")
-  |> should.be_ok
+pub fn compile_excluding_test() {
+  ptern.compile("'a'..'z' excluding 'q'") |> should.be_ok
+}
+
+// ---------------------------------------------------------------------------
+// matches / starts / ends / contained_in
+// ---------------------------------------------------------------------------
+
+pub fn matches_exact_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.matches(p, "hello") |> should.be_true
+}
+
+pub fn matches_rejects_partial_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.matches(p, "hello world") |> should.be_false
+}
+
+pub fn starts_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.starts(p, "hello world") |> should.be_true
+}
+
+pub fn starts_rejects_non_prefix_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.starts(p, "say hello") |> should.be_false
+}
+
+pub fn ends_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.ends(p, "say hello") |> should.be_true
+}
+
+pub fn ends_rejects_non_suffix_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.ends(p, "hello world") |> should.be_false
+}
+
+pub fn contained_in_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.contained_in(p, "say hello world") |> should.be_true
+}
+
+pub fn contained_in_rejects_absent_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.contained_in(p, "goodbye world") |> should.be_false
+}
+
+pub fn case_insensitive_matches_test() {
+  let assert Ok(p) = ptern.compile("@case-insensitive = true\n'hello'")
+  ptern.matches(p, "HELLO") |> should.be_true
+}
+
+pub fn digit_pattern_matches_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4")
+  ptern.matches(p, "2026") |> should.be_true
+}
+
+pub fn digit_pattern_rejects_letters_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4")
+  ptern.matches(p, "abcd") |> should.be_false
+}
+
+pub fn alternation_matches_either_test() {
+  let assert Ok(p) = ptern.compile("'cat' | 'dog'")
+  ptern.matches(p, "cat") |> should.be_true
+  ptern.matches(p, "dog") |> should.be_true
+  ptern.matches(p, "fish") |> should.be_false
+}
+
+// ---------------------------------------------------------------------------
+// match (named captures)
+// ---------------------------------------------------------------------------
+
+pub fn match_returns_none_on_no_match_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.match(p, "goodbye") |> should.equal(None)
+}
+
+pub fn match_returns_some_on_match_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.match(p, "hello") |> should.not_equal(None)
+}
+
+pub fn match_returns_named_captures_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let assert Some(groups) = ptern.match(p, "2026")
+  dict.get(groups, "year") |> should.equal(Ok("2026"))
+}
+
+pub fn match_iso_date_captures_test() {
+  let src =
+    "yyyy = %Digit * 4;\n"
+    <> "mm = ('0' '1'..'9') | ('1' '0'..'2');\n"
+    <> "dd = ('0' '1'..'9') | ('1'..'2' %Digit) | ('3' '0'..'1');\n"
+    <> "{yyyy} as year '-' {mm} as month '-' {dd} as day"
+  let assert Ok(p) = ptern.compile(src)
+  let assert Some(groups) = ptern.match(p, "2026-07-04")
+  dict.get(groups, "year") |> should.equal(Ok("2026"))
+  dict.get(groups, "month") |> should.equal(Ok("07"))
+  dict.get(groups, "day") |> should.equal(Ok("04"))
 }
 
 // ---------------------------------------------------------------------------
@@ -90,156 +167,97 @@ pub fn compile_excluding_charclass_test() {
 
 pub fn min_length_literal_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  p.min_length |> should.equal(5)
+  ptern.min_length(p) |> should.equal(5)
 }
 
 pub fn max_length_literal_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  p.max_length |> should.equal(Some(5))
+  ptern.max_length(p) |> should.equal(Some(5))
 }
 
 pub fn min_length_digit_test() {
   let assert Ok(p) = ptern.compile("%Digit")
-  p.min_length |> should.equal(1)
+  ptern.min_length(p) |> should.equal(1)
 }
 
 pub fn max_length_digit_test() {
   let assert Ok(p) = ptern.compile("%Digit")
-  p.max_length |> should.equal(Some(1))
+  ptern.max_length(p) |> should.equal(Some(1))
 }
 
 pub fn min_length_exact_repetition_test() {
   let assert Ok(p) = ptern.compile("%Digit * 4")
-  p.min_length |> should.equal(4)
+  ptern.min_length(p) |> should.equal(4)
 }
 
 pub fn max_length_exact_repetition_test() {
   let assert Ok(p) = ptern.compile("%Digit * 4")
-  p.max_length |> should.equal(Some(4))
+  ptern.max_length(p) |> should.equal(Some(4))
 }
 
 pub fn min_length_bounded_repetition_test() {
   let assert Ok(p) = ptern.compile("%Digit * 2..5")
-  p.min_length |> should.equal(2)
+  ptern.min_length(p) |> should.equal(2)
 }
 
 pub fn max_length_bounded_repetition_test() {
   let assert Ok(p) = ptern.compile("%Digit * 2..5")
-  p.max_length |> should.equal(Some(5))
+  ptern.max_length(p) |> should.equal(Some(5))
 }
 
 pub fn max_length_unbounded_repetition_test() {
   let assert Ok(p) = ptern.compile("%Digit * 1..?")
-  p.max_length |> should.equal(None)
+  ptern.max_length(p) |> should.equal(None)
 }
 
 pub fn min_length_unbounded_repetition_test() {
   let assert Ok(p) = ptern.compile("%Digit * 1..?")
-  p.min_length |> should.equal(1)
+  ptern.min_length(p) |> should.equal(1)
 }
 
 pub fn min_length_optional_is_zero_test() {
   let assert Ok(p) = ptern.compile("%Digit * 0..1")
-  p.min_length |> should.equal(0)
+  ptern.min_length(p) |> should.equal(0)
 }
 
 pub fn max_length_optional_is_one_test() {
   let assert Ok(p) = ptern.compile("%Digit * 0..1")
-  p.max_length |> should.equal(Some(1))
+  ptern.max_length(p) |> should.equal(Some(1))
 }
 
 pub fn min_length_sequence_test() {
   let assert Ok(p) = ptern.compile("'ab' %Digit")
-  p.min_length |> should.equal(3)
+  ptern.min_length(p) |> should.equal(3)
 }
 
 pub fn max_length_sequence_test() {
   let assert Ok(p) = ptern.compile("'ab' %Digit")
-  p.max_length |> should.equal(Some(3))
+  ptern.max_length(p) |> should.equal(Some(3))
 }
 
 pub fn min_length_alternation_test() {
   let assert Ok(p) = ptern.compile("'a' | 'bcd'")
-  p.min_length |> should.equal(1)
+  ptern.min_length(p) |> should.equal(1)
 }
 
 pub fn max_length_alternation_test() {
   let assert Ok(p) = ptern.compile("'a' | 'bcd'")
-  p.max_length |> should.equal(Some(3))
+  ptern.max_length(p) |> should.equal(Some(3))
 }
 
 pub fn max_length_alternation_with_unbounded_test() {
   let assert Ok(p) = ptern.compile("'a' | %Digit * 1..?")
-  p.max_length |> should.equal(None)
+  ptern.max_length(p) |> should.equal(None)
 }
 
 pub fn min_length_definition_interpolation_test() {
   let assert Ok(p) = ptern.compile("d = %Digit * 4; {d}")
-  p.min_length |> should.equal(4)
+  ptern.min_length(p) |> should.equal(4)
 }
 
 pub fn max_length_definition_interpolation_test() {
   let assert Ok(p) = ptern.compile("d = %Digit * 4; {d}")
-  p.max_length |> should.equal(Some(4))
-}
-
-// ---------------------------------------------------------------------------
-// Codegen — alternation merges into character class
-// ---------------------------------------------------------------------------
-
-pub fn alternation_two_literals_merges_to_class_test() {
-  let assert Ok(p) = ptern.compile("'a' | 'b'")
-  p.source |> should.equal("[ab]")
-}
-
-pub fn alternation_three_literals_merges_to_class_test() {
-  let assert Ok(p) = ptern.compile("'a' | 'b' | 'c'")
-  p.source |> should.equal("[abc]")
-}
-
-pub fn alternation_two_charclasses_merges_test() {
-  let assert Ok(p) = ptern.compile("%Digit | %Alpha")
-  p.source |> should.equal("[[0-9][A-Za-z]]")
-}
-
-pub fn alternation_literal_and_charclass_merges_test() {
-  let assert Ok(p) = ptern.compile("'_' | %Alpha")
-  p.source |> should.equal("[_[A-Za-z]]")
-}
-
-pub fn alternation_range_and_literal_merges_test() {
-  let assert Ok(p) = ptern.compile("'a'..'z' | '_'")
-  p.source |> should.equal("[[a-z]_]")
-}
-
-pub fn alternation_range_and_charclass_merges_test() {
-  let assert Ok(p) = ptern.compile("'a'..'z' | %Digit")
-  p.source |> should.equal("[[a-z][0-9]]")
-}
-
-pub fn alternation_excluding_merges_test() {
-  let assert Ok(p) = ptern.compile("'a'..'z' excluding 'q' | %Digit")
-  p.source |> should.equal("[[[a-z]--[q]][0-9]]")
-}
-
-pub fn alternation_multi_char_literal_does_not_merge_test() {
-  let assert Ok(p) = ptern.compile("'ab' | 'c'")
-  p.source |> should.equal("ab|c")
-}
-
-pub fn alternation_group_does_not_merge_test() {
-  let assert Ok(p) = ptern.compile("'a' | ('b')")
-  p.source |> should.equal("a|(?:b)")
-}
-
-pub fn alternation_single_item_not_wrapped_in_class_test() {
-  let assert Ok(p) = ptern.compile("'a'")
-  p.source |> should.equal("a")
-}
-
-pub fn alternation_merge_inside_group_test() {
-  let assert Ok(p) = ptern.compile("('a' | 'b') * 3")
-  p.source |> should.equal("(?:[ab]){3}")
+  ptern.max_length(p) |> should.equal(Some(4))
 }
 
 // ---------------------------------------------------------------------------

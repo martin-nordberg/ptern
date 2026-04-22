@@ -6,7 +6,7 @@ import gleam/result
 import gleam/string
 import parser/ast.{
   type Atom, type Capture, type Definition, type Exclusion, type Expression,
-  type Ptern, type RangeItem, type RepCount, type Repetition, type Sequence,
+  type ParsedPtern, type RangeItem, type RepCount, type Repetition, type Sequence,
   Alternation, CharClass, CharRange, Exact, Group, Interpolation, Literal,
   RepCount, Sequence, SingleAtom, Unbounded,
 }
@@ -26,7 +26,7 @@ pub type CompiledPtern {
 }
 
 /// Compile a semantically-validated Ptern AST into a JavaScript regex.
-pub fn compile(ptern: Ptern) -> CompiledPtern {
+pub fn compile(ptern: ParsedPtern) -> CompiledPtern {
   let flags = determine_flags(ptern.annotations)
   let defs = compile_definitions(ptern.definitions)
   let source = compile_expression(ptern.body, defs)

@@ -2,7 +2,7 @@ import gleam/option.{None, Some}
 import lexer/lexer
 import parser/ast.{
   Alternation, Annotation, Capture, CharClass, CharRange, Definition, Exact,
-  Exclusion, Group, Interpolation, Literal, None as RepNone, Ptern, RepCount,
+  Exclusion, Group, Interpolation, Literal, None as RepNone, ParsedPtern, RepCount,
   Repetition, Sequence, SingleAtom, Unbounded, UnexpectedEndOfInput,
   UnexpectedToken,
 }
@@ -19,7 +19,7 @@ fn parse(input: String) {
 }
 
 fn simple_atom(atom) {
-  Ptern(
+  ParsedPtern(
     [],
     [],
     Alternation([
@@ -83,7 +83,7 @@ pub fn parse_char_range_test() {
   parse("'a'..'z'")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [],
         Alternation([
@@ -110,7 +110,7 @@ pub fn parse_exclusion_test() {
   parse("%Digit excluding '8'..'9'")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [],
         Alternation([
@@ -140,7 +140,7 @@ pub fn parse_exact_repetition_test() {
   parse("%Digit * 4")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [],
         Alternation([
@@ -163,7 +163,7 @@ pub fn parse_bounded_repetition_test() {
   parse("'x' * 3..10")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [],
         Alternation([
@@ -186,7 +186,7 @@ pub fn parse_unbounded_repetition_test() {
   parse("%Digit * 1..?")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [],
         Alternation([
@@ -213,7 +213,7 @@ pub fn parse_named_capture_test() {
   parse("%Digit * 4 as year")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [],
         Alternation([
@@ -240,7 +240,7 @@ pub fn parse_sequence_test() {
   parse("'a' 'b'")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [],
         Alternation([
@@ -268,7 +268,7 @@ pub fn parse_alternation_test() {
   parse("'a' | 'b'")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [],
         Alternation([
@@ -294,7 +294,7 @@ pub fn parse_three_alternatives_test() {
   parse("'a' | 'b' | 'c'")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [],
         Alternation([
@@ -330,7 +330,7 @@ pub fn parse_definition_test() {
   parse("d = %Digit; {d}")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [],
         [
           Definition(
@@ -369,7 +369,7 @@ pub fn parse_annotation_true_test() {
   parse("@case-insensitive = true\n'x'")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [Annotation("case-insensitive", True)],
         [],
         Alternation([
@@ -389,7 +389,7 @@ pub fn parse_annotation_false_test() {
   parse("@case-insensitive = false\n%Digit")
   |> should.equal(
     Ok(
-      Ptern(
+      ParsedPtern(
         [Annotation("case-insensitive", False)],
         [],
         Alternation([

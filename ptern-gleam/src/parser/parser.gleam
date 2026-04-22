@@ -4,11 +4,12 @@ import gleam/result
 import lexer/token
 import parser/ast.{
   type Annotation, type Atom, type Capture, type Definition, type Exclusion,
-  type Expression, type ParseError, type Ptern, type RangeItem, type RepCount,
-  type RepUpper, type Repetition, type Sequence, Alternation, Annotation,
-  Capture, CharClass, CharRange, Definition, Exact, Exclusion, Group,
-  Interpolation, Literal, None as RepNone, Ptern, RepCount, Repetition,
-  Sequence, SingleAtom, Unbounded, UnexpectedEndOfInput, UnexpectedToken,
+  type Expression, type ParseError, type ParsedPtern, type RangeItem,
+  type RepCount, type RepUpper, type Repetition, type Sequence, Alternation,
+  Annotation, Capture, CharClass, CharRange, Definition, Exact, Exclusion,
+  Group, Interpolation, Literal, None as RepNone, ParsedPtern, RepCount,
+  Repetition, Sequence, SingleAtom, Unbounded, UnexpectedEndOfInput,
+  UnexpectedToken,
 }
 import parser/stream.{type Stream}
 
@@ -17,7 +18,7 @@ import parser/stream.{type Stream}
 // ---------------------------------------------------------------------------
 
 /// Parse a list of tokens (as returned by the lexer) into a `Ptern` AST.
-pub fn parse(tokens: List(token.Token)) -> Result(Ptern, ParseError) {
+pub fn parse(tokens: List(token.Token)) -> Result(ParsedPtern, ParseError) {
   let s = stream.new(tokens)
   use #(ptern, s2) <- result.try(parse_ptern(s))
   // There must be no meaningful tokens remaining after the body expression.
@@ -37,11 +38,11 @@ pub fn parse(tokens: List(token.Token)) -> Result(Ptern, ParseError) {
 // Top-level: annotations, definitions, body
 // ---------------------------------------------------------------------------
 
-fn parse_ptern(s: Stream) -> Result(#(Ptern, Stream), ParseError) {
+fn parse_ptern(s: Stream) -> Result(#(ParsedPtern, Stream), ParseError) {
   use #(annotations, s) <- result.try(parse_annotations(s, []))
   use #(definitions, s) <- result.try(parse_definitions(s, []))
   use #(body, s) <- result.try(parse_expression(s))
-  Ok(#(Ptern(annotations, definitions, body), s))
+  Ok(#(ParsedPtern(annotations, definitions, body), s))
 }
 
 // Greedily consume annotations: `@ identifier = true|false`.
