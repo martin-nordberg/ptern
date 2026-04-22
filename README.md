@@ -86,6 +86,23 @@ isoDate.match("2026-07-04")            // { year: "2026", month: "07", day: "04"
 isoDate.maxLength()                    // 10
 ```
 
+### Gleam
+
+```gleam
+import ptern
+
+let assert Ok(iso_date) = ptern.compile("
+  yyyy = %Digit * 4;
+  mm = ('0' '1'..'9') | ('1' '0'..'2');
+  dd = ('0' '1'..'9') | ('1'..'2' %Digit) | ('3' '0'..'1');
+  {yyyy} as year '-' {mm} as month '-' {dd} as day
+")
+
+ptern.matches(iso_date, "2026-07-04")   // True
+ptern.match(iso_date, "2026-07-04")     // Some(dict with year/month/day)
+ptern.max_length(iso_date)              // Some(10)
+```
+
 *More language bindings are planned.*
 
 
