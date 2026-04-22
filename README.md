@@ -62,6 +62,12 @@ isoDate.matchAllIn("2026-07-04 and 2026-12-25")
 //   { index: 0,  length: 10, captures: { year: "2026", month: "07", day: "04" } },
 //   { index: 15, length: 10, captures: { year: "2026", month: "12", day: "25" } }
 // ]
+
+isoDate.replaceFirstIn("Independence Day 2026-07-04 - the 250th", { year: "2027" })
+// "Independence Day 2027-07-04 - the 250th"
+
+isoDate.replaceAllIn("2026-07-04 and 2026-12-25", { year: "2027" })
+// "2027-07-04 and 2027-12-25"
 ```
 
 A ptern also offers metadata about the pattern itself. For example:

@@ -6,7 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Ptern** is a Gleam library (JavaScript target) that compiles a readable pattern language (called "pterns") into regular expressions via tagged template literals. The goal is to provide an alternative to regex that is far more readable while preserving the power of pattern matching, capturing, and metadata queries.
 
-The public API of a compiled ptern (the `Ptern` interface in `index.ts`) includes: `matchesAllOf()`, `matchesStartOf()`, `matchesEndOf()`, `matchesIn()`, `matchAllOf()`, `matchStartOf()`, `matchEndOf()`, `matchFirstIn()`, `matchNextIn(startIndex)`, `matchAllIn()`, `maxLength()`, `minLength()`. The `matchXyz()` functions return `MatchOccurrence | null` (or `MatchOccurrence[]` for `matchAllIn`), where `MatchOccurrence` carries `index`, `length`, and `captures`.
+The public API of a compiled ptern (the `Ptern` interface in `index.ts`) includes:
+- Boolean tests: `matchesAllOf()`, `matchesStartOf()`, `matchesEndOf()`, `matchesIn()`
+- Occurrence queries: `matchAllOf()`, `matchStartOf()`, `matchEndOf()`, `matchFirstIn()`, `matchNextIn(startIndex)`, `matchAllIn()` — return `MatchOccurrence | null` (or `MatchOccurrence[]`), where `MatchOccurrence` carries `index`, `length`, and `captures`
+- Replacements: `replaceAllOf(replacements)`, `replaceStartOf(replacements)`, `replaceEndOf(replacements)`, `replaceFirstIn(replacements)`, `replaceNextIn(startIndex, replacements)`, `replaceAllIn(replacements)` — take a `MatchResult`-shaped replacements dict, return the modified string (or the original if no match)
+- Metadata: `maxLength()`, `minLength()`
+
+Replace operations use the JavaScript `d` flag (`hasIndices`) on all internal regexes to resolve per-capture positions precisely.
 
 ## Commands
 

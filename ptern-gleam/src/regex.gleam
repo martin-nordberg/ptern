@@ -26,3 +26,25 @@ pub fn exec_all_rich(
   regex: Regex,
   input: String,
 ) -> List(#(Int, Int, List(#(String, String))))
+
+@external(javascript, "./ptern_ffi.mjs", "replace_regex_rich")
+pub fn replace_rich(
+  regex: Regex,
+  input: String,
+  replacements: List(#(String, String)),
+) -> String
+
+@external(javascript, "./ptern_ffi.mjs", "replace_regex_from_rich")
+pub fn replace_from_rich(
+  regex: Regex,
+  input: String,
+  start_index: Int,
+  replacements: List(#(String, String)),
+) -> String
+
+@external(javascript, "./ptern_ffi.mjs", "replace_all_regex_rich")
+pub fn replace_all_rich(
+  regex: Regex,
+  input: String,
+  replacements: List(#(String, String)),
+) -> String

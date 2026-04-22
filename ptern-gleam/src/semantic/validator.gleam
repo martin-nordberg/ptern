@@ -28,7 +28,7 @@ pub fn validate(ptern: ParsedPtern) -> List(SemanticError) {
 // ---------------------------------------------------------------------------
 
 fn known_annotation_names() -> List(String) {
-  ["case-insensitive"]
+  ["case-insensitive", "replacements-preserve-matching"]
 }
 
 fn validate_annotations(

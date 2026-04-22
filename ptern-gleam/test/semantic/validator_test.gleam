@@ -162,6 +162,11 @@ pub fn unknown_annotation_test() {
   errs |> should.equal([UnknownAnnotation("typo")])
 }
 
+pub fn replacements_preserve_matching_annotation_accepted_test() {
+  validate("@replacements-preserve-matching = true\n'x'")
+  |> should.equal([])
+}
+
 pub fn duplicate_annotation_test() {
   let errs = validate("@case-insensitive = true\n@case-insensitive = false\n'x'")
   errs |> should.equal([DuplicateAnnotation("case-insensitive")])

@@ -31,6 +31,10 @@ pub type MatchOccurrence {
   MatchOccurrence(index: Int, length: Int, captures: dict.Dict(String, String))
 }
 
+pub type ReplacementError {
+  InvalidReplacementValue(capture_name: String, value: String)
+}
+
 pub opaque type Ptern {
   Ptern(
     full_re: regex.Regex,
@@ -40,6 +44,8 @@ pub opaque type Ptern {
     contains_g_re: regex.Regex,
     min_len: Int,
     max_len: Option(Int),
+    preserve_matching: Bool,
+    capture_validators: dict.Dict(String, regex.Regex),
   )
 }
 
@@ -59,18 +65,27 @@ pub fn compile(source: String) -> Result(Ptern, CompileError) {
       let bounds = compute_ptern_bounds(parsed)
       let src = compiled.source
       let flg = compiled.flags
-      let g_flg = case string.contains(flg, "g") {
+      let d_flg = case string.contains(flg, "d") {
         True -> flg
-        False -> flg <> "g"
+        False -> flg <> "d"
+      }
+      let g_flg = case string.contains(d_flg, "g") {
+        True -> d_flg
+        False -> d_flg <> "g"
       }
       Ok(Ptern(
-        full_re: regex.make("^(?:" <> src <> ")$", flg),
-        starts_re: regex.make("^(?:" <> src <> ")", flg),
-        ends_re: regex.make("(?:" <> src <> ")$", flg),
-        contains_re: regex.make(src, flg),
+        full_re: regex.make("^(?:" <> src <> ")$", d_flg),
+        starts_re: regex.make("^(?:" <> src <> ")", d_flg),
+        ends_re: regex.make("(?:" <> src <> ")$", d_flg),
+        contains_re: regex.make(src, d_flg),
         contains_g_re: regex.make(src, g_flg),
         min_len: bounds.min,
         max_len: bounds.max,
+        preserve_matching: compiled.preserve_matching,
+        capture_validators: build_capture_validators(
+          compiled.capture_validators,
+          d_flg,
+        ),
       ))
     }
   }
@@ -145,6 +160,116 @@ fn to_occurrence(
 ) -> MatchOccurrence {
   let #(idx, len, pairs) = t
   MatchOccurrence(index: idx, length: len, captures: dict.from_list(pairs))
+}
+
+fn build_capture_validators(
+  fragments: List(#(String, String)),
+  flags: String,
+) -> dict.Dict(String, regex.Regex) {
+  list.fold(fragments, dict.new(), fn(acc, pair) {
+    let #(name, fragment) = pair
+    dict.insert(acc, name, regex.make("^(?:" <> fragment <> ")$", flags))
+  })
+}
+
+fn validate_replacements(
+  ptern: Ptern,
+  replacements: dict.Dict(String, String),
+) -> Result(Nil, ReplacementError) {
+  case ptern.preserve_matching {
+    False -> Ok(Nil)
+    True ->
+      dict.fold(replacements, Ok(Nil), fn(acc, name, value) {
+        case acc {
+          Error(_) -> acc
+          Ok(_) ->
+            case dict.get(ptern.capture_validators, name) {
+              Error(_) -> Ok(Nil)
+              Ok(re) ->
+                case regex.test_re(re, value) {
+                  True -> Ok(Nil)
+                  False -> Error(InvalidReplacementValue(name, value))
+                }
+            }
+        }
+      })
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Replacing
+// ---------------------------------------------------------------------------
+
+/// Replace the match if the entire input matches, otherwise return input unchanged.
+/// Returns `Error(InvalidReplacementValue(...))` when `@replacements-preserve-matching = true`
+/// and a replacement value does not match the capture's subpattern.
+pub fn replace_all_of(
+  ptern: Ptern,
+  input: String,
+  replacements: dict.Dict(String, String),
+) -> Result(String, ReplacementError) {
+  use _ <- result.try(validate_replacements(ptern, replacements))
+  Ok(regex.replace_rich(ptern.full_re, input, dict.to_list(replacements)))
+}
+
+/// Replace the match at the start of input, otherwise return input unchanged.
+pub fn replace_start_of(
+  ptern: Ptern,
+  input: String,
+  replacements: dict.Dict(String, String),
+) -> Result(String, ReplacementError) {
+  use _ <- result.try(validate_replacements(ptern, replacements))
+  Ok(regex.replace_rich(ptern.starts_re, input, dict.to_list(replacements)))
+}
+
+/// Replace the match at the end of input, otherwise return input unchanged.
+pub fn replace_end_of(
+  ptern: Ptern,
+  input: String,
+  replacements: dict.Dict(String, String),
+) -> Result(String, ReplacementError) {
+  use _ <- result.try(validate_replacements(ptern, replacements))
+  Ok(regex.replace_rich(ptern.ends_re, input, dict.to_list(replacements)))
+}
+
+/// Replace the first occurrence anywhere in the input, otherwise return input unchanged.
+pub fn replace_first_in(
+  ptern: Ptern,
+  input: String,
+  replacements: dict.Dict(String, String),
+) -> Result(String, ReplacementError) {
+  use _ <- result.try(validate_replacements(ptern, replacements))
+  Ok(regex.replace_rich(ptern.contains_re, input, dict.to_list(replacements)))
+}
+
+/// Replace the next occurrence at or after start_index, otherwise return input unchanged.
+pub fn replace_next_in(
+  ptern: Ptern,
+  input: String,
+  start_index: Int,
+  replacements: dict.Dict(String, String),
+) -> Result(String, ReplacementError) {
+  use _ <- result.try(validate_replacements(ptern, replacements))
+  Ok(regex.replace_from_rich(
+    ptern.contains_g_re,
+    input,
+    start_index,
+    dict.to_list(replacements),
+  ))
+}
+
+/// Replace all occurrences with the same replacements.
+pub fn replace_all_in(
+  ptern: Ptern,
+  input: String,
+  replacements: dict.Dict(String, String),
+) -> Result(String, ReplacementError) {
+  use _ <- result.try(validate_replacements(ptern, replacements))
+  Ok(regex.replace_all_rich(
+    ptern.contains_g_re,
+    input,
+    dict.to_list(replacements),
+  ))
 }
 
 // ---------------------------------------------------------------------------

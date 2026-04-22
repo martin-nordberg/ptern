@@ -35,6 +35,8 @@ interface GleamCompiledPattern {
   flags: string;
   min_length: number;
   max_length: GleamOption;
+  preserve_matching: boolean;
+  capture_validators: unknown; // Gleam List(#(String, String))
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +77,22 @@ export interface Ptern {
   matchNextIn(input: string, startIndex: number): MatchOccurrence | null;
   /** Returns all occurrences in the input. */
   matchAllIn(input: string): MatchOccurrence[];
+  /**
+   * Replace the match if the entire input matches, otherwise return input unchanged.
+   * Throws `ReplacementError` if `@replacements-preserve-matching = true` and a value
+   * does not satisfy the capture's subpattern.
+   */
+  replaceAllOf(input: string, replacements: MatchResult): string;
+  /** Replace the match at the start of input, otherwise return input unchanged. */
+  replaceStartOf(input: string, replacements: MatchResult): string;
+  /** Replace the match at the end of input, otherwise return input unchanged. */
+  replaceEndOf(input: string, replacements: MatchResult): string;
+  /** Replace the first occurrence anywhere in the input, otherwise return input unchanged. */
+  replaceFirstIn(input: string, replacements: MatchResult): string;
+  /** Replace the next occurrence at or after startIndex, otherwise return input unchanged. */
+  replaceNextIn(input: string, startIndex: number, replacements: MatchResult): string;
+  /** Replace all occurrences with the same replacements. */
+  replaceAllIn(input: string, replacements: MatchResult): string;
   /** Minimum number of characters this pattern can match. */
   minLength(): number;
   /**
@@ -89,6 +107,12 @@ export type CompileError =
   | { kind: "ParseError"; message: string }
   | { kind: "SemanticErrors"; errors: string[] };
 
+export type ReplacementError = {
+  kind: "InvalidReplacementValue";
+  captureName: string;
+  value: string;
+};
+
 // ---------------------------------------------------------------------------
 // Internal implementation
 // ---------------------------------------------------------------------------
@@ -101,20 +125,37 @@ class PternImpl implements Ptern {
   private readonly _containsG: RegExp;
   private readonly _min: number;
   private readonly _max: number | null;
+  private readonly _preserveMatching: boolean;
+  private readonly _captureValidators: Map<string, RegExp>;
 
   constructor(
     source: string,
     flags: string,
     minLen: number,
     maxLen: number | null,
+    preserveMatching: boolean,
+    captureValidators: Map<string, RegExp>,
   ) {
-    this._full = new RegExp(`^(?:${source})$`, flags);
-    this._starts = new RegExp(`^(?:${source})`, flags);
-    this._ends = new RegExp(`(?:${source})$`, flags);
-    this._contains = new RegExp(source, flags);
-    this._containsG = new RegExp(source, flags.includes("g") ? flags : flags + "g");
+    const df = flags.includes("d") ? flags : flags + "d";
+    this._full = new RegExp(`^(?:${source})$`, df);
+    this._starts = new RegExp(`^(?:${source})`, df);
+    this._ends = new RegExp(`(?:${source})$`, df);
+    this._contains = new RegExp(source, df);
+    this._containsG = new RegExp(source, df.includes("g") ? df : df + "g");
     this._min = minLen;
     this._max = maxLen;
+    this._preserveMatching = preserveMatching;
+    this._captureValidators = captureValidators;
+  }
+
+  private validateReplacements(replacements: MatchResult): void {
+    if (!this._preserveMatching) return;
+    for (const [name, value] of Object.entries(replacements)) {
+      const re = this._captureValidators.get(name);
+      if (re !== undefined && !re.test(value)) {
+        throw { kind: "InvalidReplacementValue", captureName: name, value } satisfies ReplacementError;
+      }
+    }
   }
 
   private static toOccurrence(m: RegExpExecArray): MatchOccurrence {
@@ -185,6 +226,91 @@ class PternImpl implements Ptern {
       if (m[0].length === 0) this._containsG.lastIndex++;
     }
     return results;
+  }
+
+  // Build the replacement text for a single match, substituting named captures.
+  // Requires the regex to have the 'd' flag so that m.indices.groups is populated.
+  private static applyReplacements(
+    m: RegExpExecArray & { indices?: { groups?: Record<string, [number, number] | undefined> } },
+    replacements: MatchResult,
+  ): string {
+    const matchStart = m.index;
+    const groupIndices = m.indices?.groups ?? {};
+    let matchText = m[0];
+    const patches = Object.entries(replacements)
+      .filter(([name]) => groupIndices[name] !== undefined)
+      .map(([name, newVal]) => ({
+        relStart: groupIndices[name]![0] - matchStart,
+        relEnd: groupIndices[name]![1] - matchStart,
+        newVal,
+      }))
+      .sort((a, b) => b.relStart - a.relStart);
+    for (const { relStart, relEnd, newVal } of patches) {
+      matchText = matchText.slice(0, relStart) + newVal + matchText.slice(relEnd);
+    }
+    return matchText;
+  }
+
+  private spliceReplacement(input: string, m: RegExpExecArray, replacements: MatchResult): string {
+    const newText = PternImpl.applyReplacements(
+      m as RegExpExecArray & { indices?: { groups?: Record<string, [number, number] | undefined> } },
+      replacements,
+    );
+    return input.slice(0, m.index) + newText + input.slice(m.index + m[0].length);
+  }
+
+  replaceAllOf(input: string, replacements: MatchResult): string {
+    this.validateReplacements(replacements);
+    this._full.lastIndex = 0;
+    const m = this._full.exec(input);
+    return m === null ? input : this.spliceReplacement(input, m, replacements);
+  }
+
+  replaceStartOf(input: string, replacements: MatchResult): string {
+    this.validateReplacements(replacements);
+    this._starts.lastIndex = 0;
+    const m = this._starts.exec(input);
+    return m === null ? input : this.spliceReplacement(input, m, replacements);
+  }
+
+  replaceEndOf(input: string, replacements: MatchResult): string {
+    this.validateReplacements(replacements);
+    this._ends.lastIndex = 0;
+    const m = this._ends.exec(input);
+    return m === null ? input : this.spliceReplacement(input, m, replacements);
+  }
+
+  replaceFirstIn(input: string, replacements: MatchResult): string {
+    this.validateReplacements(replacements);
+    this._contains.lastIndex = 0;
+    const m = this._contains.exec(input);
+    return m === null ? input : this.spliceReplacement(input, m, replacements);
+  }
+
+  replaceNextIn(input: string, startIndex: number, replacements: MatchResult): string {
+    this.validateReplacements(replacements);
+    this._containsG.lastIndex = startIndex;
+    const m = this._containsG.exec(input);
+    return m === null ? input : this.spliceReplacement(input, m, replacements);
+  }
+
+  replaceAllIn(input: string, replacements: MatchResult): string {
+    this.validateReplacements(replacements);
+    this._containsG.lastIndex = 0;
+    const parts: string[] = [];
+    let lastEnd = 0;
+    let m: RegExpExecArray | null;
+    while ((m = this._containsG.exec(input)) !== null) {
+      parts.push(input.slice(lastEnd, m.index));
+      parts.push(PternImpl.applyReplacements(
+        m as RegExpExecArray & { indices?: { groups?: Record<string, [number, number] | undefined> } },
+        replacements,
+      ));
+      lastEnd = m.index + m[0].length;
+      if (m[0].length === 0) this._containsG.lastIndex++;
+    }
+    parts.push(input.slice(lastEnd));
+    return parts.join("");
   }
 
   minLength(): number {
@@ -271,7 +397,13 @@ export function compile(source: string): Ptern {
   const maxLen =
     cp.max_length[0] !== undefined ? (cp.max_length[0] as number) : null;
 
-  return new PternImpl(cp.source, cp.flags, cp.min_length, maxLen);
+  const cvEntries = gleamListToArray(cp.capture_validators) as Array<[string, string]>;
+  const df = cp.flags.includes("d") ? cp.flags : cp.flags + "d";
+  const captureValidators = new Map<string, RegExp>(
+    cvEntries.map(([name, fragment]) => [name, new RegExp(`^(?:${fragment})$`, df)]),
+  );
+
+  return new PternImpl(cp.source, cp.flags, cp.min_length, maxLen, cp.preserve_matching, captureValidators);
 }
 
 // ---------------------------------------------------------------------------

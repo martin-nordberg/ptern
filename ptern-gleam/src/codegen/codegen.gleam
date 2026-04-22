@@ -22,15 +22,22 @@ pub type CompiledPtern {
     source: String,
     /// The regex flags to use, always including `"v"` (Unicode sets mode).
     flags: String,
+    /// Whether `@replacements-preserve-matching = true` was set.
+    preserve_matching: Bool,
+    /// Per-capture regex fragments: [(captureName, fragment), ...].
+    /// Each fragment is suitable for wrapping as `^(?:fragment)$` to validate a replacement value.
+    capture_validators: List(#(String, String)),
   )
 }
 
 /// Compile a semantically-validated Ptern AST into a JavaScript regex.
 pub fn compile(ptern: ParsedPtern) -> CompiledPtern {
   let flags = determine_flags(ptern.annotations)
+  let preserve = determine_preserve_matching(ptern.annotations)
   let defs = compile_definitions(ptern.definitions)
   let source = compile_expression(ptern.body, defs)
-  CompiledPtern(source, flags)
+  let validators = collect_capture_validators(ptern.body, defs)
+  CompiledPtern(source, flags, preserve, validators)
 }
 
 // ---------------------------------------------------------------------------
@@ -44,6 +51,12 @@ fn determine_flags(annotations: List(ast.Annotation)) -> String {
     True -> "vi"
     False -> "v"
   }
+}
+
+fn determine_preserve_matching(annotations: List(ast.Annotation)) -> Bool {
+  list.any(annotations, fn(a) {
+    a.name == "replacements-preserve-matching" && a.value
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -492,5 +505,75 @@ fn interpolations_in_atom(atom: Atom) -> List(String) {
     Literal(_) | CharClass(_) -> []
     Interpolation(name) -> [name]
     Group(expr) -> interpolations_in_expression(expr)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Capture validator collection
+// ---------------------------------------------------------------------------
+
+// Walk the expression tree and collect (captureName, regexFragment) pairs for
+// every named capture. The fragment is the fully-resolved regex for that
+// capture's body and is suitable for use as `^(?:fragment)$`.
+fn collect_capture_validators(
+  expr: Expression,
+  defs: Dict(String, String),
+) -> List(#(String, String)) {
+  let Alternation(seqs) = expr
+  list.flat_map(seqs, fn(seq) { collect_validators_in_sequence(seq, defs) })
+}
+
+fn collect_validators_in_sequence(
+  seq: Sequence,
+  defs: Dict(String, String),
+) -> List(#(String, String)) {
+  let Sequence(items) = seq
+  list.flat_map(items, fn(cap) { collect_validators_in_capture(cap, defs) })
+}
+
+fn collect_validators_in_capture(
+  cap: Capture,
+  defs: Dict(String, String),
+) -> List(#(String, String)) {
+  let body = compile_repetition(cap.inner, defs)
+  let own = case cap.name {
+    None -> []
+    Some(name) -> [#(name, body)]
+  }
+  let nested = collect_validators_in_repetition(cap.inner, defs)
+  list.append(own, nested)
+}
+
+fn collect_validators_in_repetition(
+  rep: Repetition,
+  defs: Dict(String, String),
+) -> List(#(String, String)) {
+  collect_validators_in_exclusion(rep.inner, defs)
+}
+
+fn collect_validators_in_exclusion(
+  excl: Exclusion,
+  defs: Dict(String, String),
+) -> List(#(String, String)) {
+  collect_validators_in_range_item(excl.base, defs)
+}
+
+fn collect_validators_in_range_item(
+  item: RangeItem,
+  defs: Dict(String, String),
+) -> List(#(String, String)) {
+  case item {
+    SingleAtom(atom) -> collect_validators_in_atom(atom, defs)
+    CharRange(_, _) -> []
+  }
+}
+
+fn collect_validators_in_atom(
+  atom: Atom,
+  defs: Dict(String, String),
+) -> List(#(String, String)) {
+  case atom {
+    Group(expr) -> collect_capture_validators(expr, defs)
+    _ -> []
   }
 }
