@@ -174,7 +174,7 @@ pub fn multi_char_literal_repetition_wraps_test() {
 }
 
 pub fn group_repetition_test() {
-  source("('a' | 'b') * 3") |> should.equal("(?:a|b){3}")
+  source("('a' | 'b') * 3") |> should.equal("(?:[ab]){3}")
 }
 
 // ---------------------------------------------------------------------------
@@ -194,11 +194,11 @@ pub fn mixed_sequence_test() {
 // ---------------------------------------------------------------------------
 
 pub fn alternation_test() {
-  source("'a' | 'b'") |> should.equal("a|b")
+  source("'a' | 'b'") |> should.equal("[ab]")
 }
 
 pub fn three_way_alternation_test() {
-  source("'a' | 'b' | 'c'") |> should.equal("a|b|c")
+  source("'a' | 'b' | 'c'") |> should.equal("[abc]")
 }
 
 // ---------------------------------------------------------------------------
@@ -237,11 +237,11 @@ pub fn exclusion_range_from_range_test() {
 // ---------------------------------------------------------------------------
 
 pub fn group_test() {
-  source("('a' | 'b')") |> should.equal("(?:a|b)")
+  source("('a' | 'b')") |> should.equal("(?:[ab])")
 }
 
 pub fn nested_group_test() {
-  source("(('a' | 'b') 'c')") |> should.equal("(?:(?:a|b)c)")
+  source("(('a' | 'b') 'c')") |> should.equal("(?:(?:[ab])c)")
 }
 
 // ---------------------------------------------------------------------------

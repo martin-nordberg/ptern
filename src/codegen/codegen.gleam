@@ -88,8 +88,16 @@ fn compile_def_memo(
 
 fn compile_expression(expr: Expression, defs: Dict(String, String)) -> String {
   let Alternation(seqs) = expr
-  list.map(seqs, fn(seq) { compile_sequence(seq, defs) })
-  |> string.join("|")
+  let mergeable = case seqs {
+    [_, _, ..] -> list.all(seqs, is_class_item)
+    _ -> False
+  }
+  case mergeable {
+    True -> "[" <> string.concat(list.map(seqs, sequence_as_class_body)) <> "]"
+    False ->
+      list.map(seqs, fn(seq) { compile_sequence(seq, defs) })
+      |> string.join("|")
+  }
 }
 
 fn compile_sequence(seq: Sequence, defs: Dict(String, String)) -> String {
@@ -154,6 +162,81 @@ fn range_item_as_class_operand(
       "[" <> raw_to_class_char(from_raw) <> "-" <> raw_to_class_char(to_raw) <> "]"
     SingleAtom(atom) -> "[" <> compile_atom_standalone(atom, defs) <> "]"
     CharRange(_, _) -> "[(?!)]"
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Character-class merging for alternations
+// ---------------------------------------------------------------------------
+
+// True when a sequence is a single unnamed, unrepeted character-set item
+// (single-char literal, charclass, or char range) that can be merged into [..].
+fn is_class_item(seq: Sequence) -> Bool {
+  let Sequence(items) = seq
+  case items {
+    [cap] ->
+      case cap.name {
+        Some(_) -> False
+        None ->
+          case cap.inner.count {
+            Some(_) -> False
+            None -> is_class_range_item(cap.inner.inner.base)
+          }
+      }
+    _ -> False
+  }
+}
+
+fn is_class_range_item(item: RangeItem) -> Bool {
+  case item {
+    SingleAtom(Literal(raw)) -> decoded_length(raw) == 1
+    SingleAtom(CharClass(_)) -> True
+    CharRange(Literal(_), Literal(_)) -> True
+    _ -> False
+  }
+}
+
+// Return the fragment to place inside `[...]` for a qualifying sequence.
+fn sequence_as_class_body(seq: Sequence) -> String {
+  let Sequence(items) = seq
+  let assert [cap] = items
+  let excl = cap.inner.inner
+  case excl.excluded {
+    None -> range_item_as_class_body(excl.base)
+    Some(excl_item) ->
+      "["
+      <> range_item_as_class_operand(excl.base, dict.new())
+      <> "--"
+      <> range_item_as_class_operand(excl_item, dict.new())
+      <> "]"
+  }
+}
+
+fn range_item_as_class_body(item: RangeItem) -> String {
+  case item {
+    SingleAtom(Literal(raw)) -> raw_to_class_char(raw)
+    SingleAtom(CharClass(name)) -> char_class_standalone(name)
+    CharRange(Literal(from_raw), Literal(to_raw)) ->
+      "[" <> raw_to_class_char(from_raw) <> "-" <> raw_to_class_char(to_raw) <> "]"
+    _ -> ""
+  }
+}
+
+fn decoded_length(raw: String) -> Int {
+  do_decoded_length(raw, 0)
+}
+
+fn do_decoded_length(s: String, count: Int) -> Int {
+  case string.pop_grapheme(s) {
+    Error(_) -> count
+    Ok(#("\\", rest)) ->
+      case string.pop_grapheme(rest) {
+        Error(_) -> count + 1
+        Ok(#("u", rest2)) ->
+          do_decoded_length(string.drop_start(rest2, 4), count + 1)
+        Ok(#(_, rest2)) -> do_decoded_length(rest2, count + 1)
+      }
+    Ok(#(_, rest)) -> do_decoded_length(rest, count + 1)
   }
 }
 
