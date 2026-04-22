@@ -6,23 +6,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Ptern** is a Gleam library (JavaScript target) that compiles a readable pattern language (called "pterns") into regular expressions via tagged template literals. The goal is to provide an alternative to regex that is far more readable while preserving the power of pattern matching, capturing, and metadata queries.
 
-The public API of a compiled ptern should include: `matches()`, `starts()`, `ends()`, `contained_in()`, `match()`, `max_length()`, `min_length()`.
+The public API of a compiled ptern (the `Ptern` interface in `index.ts`) includes: `matches()`, `starts()`, `ends()`, `containedIn()`, `match()`, `maxLength()`, `minLength()`.
 
 ## Commands
 
 ```sh
-gleam build          # Build the project
-gleam test           # Run all tests
+gleam build          # Build the Gleam library to build/dev/javascript/
+gleam test           # Run all Gleam tests
 gleam run            # Run src/ptern.gleam main
 gleam check          # Type-check without building
 gleam add <package>  # Add a dependency
+bun index.ts         # Run the TypeScript wrapper directly (requires gleam build first)
 ```
 
 The project targets JavaScript only (`target = "javascript"` in `gleam.toml`) and runs on Bun.
 
 ## Project Structure
 
-- `src/ptern.gleam` — library entry point
+- `src/ptern.gleam` — Gleam library entry point; exposes `compile/1`
+- `index.ts` — TypeScript public API: `ptern` tagged template literal, `compile()`, and the `Ptern` interface; wraps the compiled Gleam output
 - `test/ptern_test.gleam` — test entry point (uses gleeunit)
 - `gleam.toml` — project manifest, dependencies, and JavaScript target config
 - `build/` — generated output (gitignored)
