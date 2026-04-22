@@ -27,12 +27,17 @@ pub type CompileError {
   SemanticErrors(List(SemanticError))
 }
 
+pub type MatchOccurrence {
+  MatchOccurrence(index: Int, length: Int, captures: dict.Dict(String, String))
+}
+
 pub opaque type Ptern {
   Ptern(
     full_re: regex.Regex,
     starts_re: regex.Regex,
     ends_re: regex.Regex,
     contains_re: regex.Regex,
+    contains_g_re: regex.Regex,
     min_len: Int,
     max_len: Option(Int),
   )
@@ -54,11 +59,16 @@ pub fn compile(source: String) -> Result(Ptern, CompileError) {
       let bounds = compute_ptern_bounds(parsed)
       let src = compiled.source
       let flg = compiled.flags
+      let g_flg = case string.contains(flg, "g") {
+        True -> flg
+        False -> flg <> "g"
+      }
       Ok(Ptern(
         full_re: regex.make("^(?:" <> src <> ")$", flg),
         starts_re: regex.make("^(?:" <> src <> ")", flg),
         ends_re: regex.make("(?:" <> src <> ")$", flg),
         contains_re: regex.make(src, flg),
+        contains_g_re: regex.make(src, g_flg),
         min_len: bounds.min,
         max_len: bounds.max,
       ))
@@ -71,32 +81,70 @@ pub fn compile(source: String) -> Result(Ptern, CompileError) {
 // ---------------------------------------------------------------------------
 
 /// Returns `True` if the entire input matches this pattern.
-pub fn matches(ptern: Ptern, input: String) -> Bool {
+pub fn matches_all_of(ptern: Ptern, input: String) -> Bool {
   regex.test_re(ptern.full_re, input)
 }
 
 /// Returns `True` if the input starts with this pattern.
-pub fn starts(ptern: Ptern, input: String) -> Bool {
+pub fn matches_start_of(ptern: Ptern, input: String) -> Bool {
   regex.test_re(ptern.starts_re, input)
 }
 
 /// Returns `True` if the input ends with this pattern.
-pub fn ends(ptern: Ptern, input: String) -> Bool {
+pub fn matches_end_of(ptern: Ptern, input: String) -> Bool {
   regex.test_re(ptern.ends_re, input)
 }
 
 /// Returns `True` if the pattern appears anywhere in the input.
-pub fn contained_in(ptern: Ptern, input: String) -> Bool {
+pub fn matches_in(ptern: Ptern, input: String) -> Bool {
   regex.test_re(ptern.contains_re, input)
 }
 
-/// Returns the named captures from the first match, or `None` if no match.
-pub fn match(
+/// Returns the match occurrence if the entire input matches, or `None`.
+pub fn match_all_of(ptern: Ptern, input: String) -> Option(MatchOccurrence) {
+  regex.exec_rich(ptern.full_re, input)
+  |> option.map(to_occurrence)
+}
+
+/// Returns the match occurrence if the input starts with this pattern, or `None`.
+pub fn match_start_of(ptern: Ptern, input: String) -> Option(MatchOccurrence) {
+  regex.exec_rich(ptern.starts_re, input)
+  |> option.map(to_occurrence)
+}
+
+/// Returns the match occurrence if the input ends with this pattern, or `None`.
+pub fn match_end_of(ptern: Ptern, input: String) -> Option(MatchOccurrence) {
+  regex.exec_rich(ptern.ends_re, input)
+  |> option.map(to_occurrence)
+}
+
+/// Returns the first match occurrence anywhere in the input, or `None`.
+pub fn match_first_in(ptern: Ptern, input: String) -> Option(MatchOccurrence) {
+  regex.exec_rich(ptern.contains_re, input)
+  |> option.map(to_occurrence)
+}
+
+/// Returns the next match occurrence at or after `start_index`, or `None`.
+pub fn match_next_in(
   ptern: Ptern,
   input: String,
-) -> Option(Dict(String, String)) {
-  regex.exec(ptern.contains_re, input)
-  |> option.map(dict.from_list)
+  start_index: Int,
+) -> Option(MatchOccurrence) {
+  regex.exec_from_rich(ptern.contains_g_re, input, start_index)
+  |> option.map(to_occurrence)
+}
+
+/// Returns all match occurrences in the input.
+pub fn match_all_in(ptern: Ptern, input: String) -> List(MatchOccurrence) {
+  regex.exec_all_rich(ptern.contains_g_re, input)
+  |> list.map(to_occurrence)
+}
+
+fn to_occurrence(
+  t: #(Int, Int, List(#(String, String))),
+) -> MatchOccurrence {
+  let #(idx, len, pairs) = t
+  MatchOccurrence(index: idx, length: len, captures: dict.from_list(pairs))
 }
 
 // ---------------------------------------------------------------------------

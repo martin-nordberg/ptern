@@ -13,8 +13,8 @@
  *     {yyyy} as year '-' {mm} as month '-' {dd} as day
  *   `
  *
- *   date.matches("2024-03-15")  // true
- *   date.match("2024-03-15")    // { year: "2024", month: "03", day: "15" }
+ *   date.matchesAllOf("2024-03-15")  // true
+ *   date.matchAllOf("2024-03-15")    // { index: 0, length: 10, captures: { year: "2024", ... } }
  */
 
 // ---------------------------------------------------------------------------
@@ -45,20 +45,36 @@ export interface MatchResult {
   [groupName: string]: string;
 }
 
+export interface MatchOccurrence {
+  /** Code-unit index of the start of the match within the input string. */
+  index: number;
+  /** Length of the matched text in code units. */
+  length: number;
+  /** Named capture groups from this match. */
+  captures: MatchResult;
+}
+
 export interface Ptern {
   /** Returns true if the entire input matches this pattern. */
-  matches(input: string): boolean;
+  matchesAllOf(input: string): boolean;
   /** Returns true if the input starts with this pattern. */
-  starts(input: string): boolean;
+  matchesStartOf(input: string): boolean;
   /** Returns true if the input ends with this pattern. */
-  ends(input: string): boolean;
+  matchesEndOf(input: string): boolean;
   /** Returns true if the pattern appears anywhere in the input. */
-  containedIn(input: string): boolean;
-  /**
-   * Returns the named capture groups from the first match, or null if there
-   * is no match.
-   */
-  match(input: string): MatchResult | null;
+  matchesIn(input: string): boolean;
+  /** Returns the occurrence if the entire input matches, otherwise null. */
+  matchAllOf(input: string): MatchOccurrence | null;
+  /** Returns the occurrence if the input starts with this pattern, otherwise null. */
+  matchStartOf(input: string): MatchOccurrence | null;
+  /** Returns the occurrence if the input ends with this pattern, otherwise null. */
+  matchEndOf(input: string): MatchOccurrence | null;
+  /** Returns the first occurrence anywhere in the input, or null. */
+  matchFirstIn(input: string): MatchOccurrence | null;
+  /** Returns the next occurrence at or after startIndex, or null. */
+  matchNextIn(input: string, startIndex: number): MatchOccurrence | null;
+  /** Returns all occurrences in the input. */
+  matchAllIn(input: string): MatchOccurrence[];
   /** Minimum number of characters this pattern can match. */
   minLength(): number;
   /**
@@ -82,6 +98,7 @@ class PternImpl implements Ptern {
   private readonly _starts: RegExp;
   private readonly _ends: RegExp;
   private readonly _contains: RegExp;
+  private readonly _containsG: RegExp;
   private readonly _min: number;
   private readonly _max: number | null;
 
@@ -95,41 +112,79 @@ class PternImpl implements Ptern {
     this._starts = new RegExp(`^(?:${source})`, flags);
     this._ends = new RegExp(`(?:${source})$`, flags);
     this._contains = new RegExp(source, flags);
+    this._containsG = new RegExp(source, flags.includes("g") ? flags : flags + "g");
     this._min = minLen;
     this._max = maxLen;
   }
 
-  matches(input: string): boolean {
+  private static toOccurrence(m: RegExpExecArray): MatchOccurrence {
+    const groups = m.groups ?? {};
+    const captures: MatchResult = {};
+    for (const [k, v] of Object.entries(groups)) {
+      if (typeof v === "string") captures[k] = v;
+    }
+    return { index: m.index, length: m[0].length, captures };
+  }
+
+  matchesAllOf(input: string): boolean {
     this._full.lastIndex = 0;
     return this._full.test(input);
   }
 
-  starts(input: string): boolean {
+  matchesStartOf(input: string): boolean {
     this._starts.lastIndex = 0;
     return this._starts.test(input);
   }
 
-  ends(input: string): boolean {
+  matchesEndOf(input: string): boolean {
     this._ends.lastIndex = 0;
     return this._ends.test(input);
   }
 
-  containedIn(input: string): boolean {
+  matchesIn(input: string): boolean {
     this._contains.lastIndex = 0;
     return this._contains.test(input);
   }
 
-  match(input: string): MatchResult | null {
+  matchAllOf(input: string): MatchOccurrence | null {
+    this._full.lastIndex = 0;
+    const m = this._full.exec(input);
+    return m === null ? null : PternImpl.toOccurrence(m);
+  }
+
+  matchStartOf(input: string): MatchOccurrence | null {
+    this._starts.lastIndex = 0;
+    const m = this._starts.exec(input);
+    return m === null ? null : PternImpl.toOccurrence(m);
+  }
+
+  matchEndOf(input: string): MatchOccurrence | null {
+    this._ends.lastIndex = 0;
+    const m = this._ends.exec(input);
+    return m === null ? null : PternImpl.toOccurrence(m);
+  }
+
+  matchFirstIn(input: string): MatchOccurrence | null {
     this._contains.lastIndex = 0;
     const m = this._contains.exec(input);
-    if (m === null) return null;
-    const groups = m.groups ?? {};
-    // Return only string-valued named captures (filter out undefined slots).
-    const result: MatchResult = {};
-    for (const [k, v] of Object.entries(groups)) {
-      if (typeof v === "string") result[k] = v;
+    return m === null ? null : PternImpl.toOccurrence(m);
+  }
+
+  matchNextIn(input: string, startIndex: number): MatchOccurrence | null {
+    this._containsG.lastIndex = startIndex;
+    const m = this._containsG.exec(input);
+    return m === null ? null : PternImpl.toOccurrence(m);
+  }
+
+  matchAllIn(input: string): MatchOccurrence[] {
+    this._containsG.lastIndex = 0;
+    const results: MatchOccurrence[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = this._containsG.exec(input)) !== null) {
+      results.push(PternImpl.toOccurrence(m));
+      if (m[0].length === 0) this._containsG.lastIndex++;
     }
-    return result;
+    return results;
   }
 
   minLength(): number {

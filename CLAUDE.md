@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Ptern** is a Gleam library (JavaScript target) that compiles a readable pattern language (called "pterns") into regular expressions via tagged template literals. The goal is to provide an alternative to regex that is far more readable while preserving the power of pattern matching, capturing, and metadata queries.
 
-The public API of a compiled ptern (the `Ptern` interface in `index.ts`) includes: `matches()`, `starts()`, `ends()`, `containedIn()`, `match()`, `maxLength()`, `minLength()`.
+The public API of a compiled ptern (the `Ptern` interface in `index.ts`) includes: `matchesAllOf()`, `matchesStartOf()`, `matchesEndOf()`, `matchesIn()`, `matchAllOf()`, `matchStartOf()`, `matchEndOf()`, `matchFirstIn()`, `matchNextIn(startIndex)`, `matchAllIn()`, `maxLength()`, `minLength()`. The `matchXyz()` functions return `MatchOccurrence | null` (or `MatchOccurrence[]` for `matchAllIn`), where `MatchOccurrence` carries `index`, `length`, and `captures`.
 
 ## Commands
 

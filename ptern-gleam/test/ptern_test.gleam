@@ -63,102 +63,173 @@ pub fn compile_excluding_test() {
 }
 
 // ---------------------------------------------------------------------------
-// matches / starts / ends / contained_in
+// matches_all_of / matches_start_of / matches_end_of / matches_in
 // ---------------------------------------------------------------------------
 
-pub fn matches_exact_test() {
+pub fn matches_all_of_exact_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.matches(p, "hello") |> should.be_true
+  ptern.matches_all_of(p, "hello") |> should.be_true
 }
 
-pub fn matches_rejects_partial_test() {
+pub fn matches_all_of_rejects_partial_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.matches(p, "hello world") |> should.be_false
+  ptern.matches_all_of(p, "hello world") |> should.be_false
 }
 
-pub fn starts_test() {
+pub fn matches_start_of_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.starts(p, "hello world") |> should.be_true
+  ptern.matches_start_of(p, "hello world") |> should.be_true
 }
 
-pub fn starts_rejects_non_prefix_test() {
+pub fn matches_start_of_rejects_non_prefix_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.starts(p, "say hello") |> should.be_false
+  ptern.matches_start_of(p, "say hello") |> should.be_false
 }
 
-pub fn ends_test() {
+pub fn matches_end_of_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.ends(p, "say hello") |> should.be_true
+  ptern.matches_end_of(p, "say hello") |> should.be_true
 }
 
-pub fn ends_rejects_non_suffix_test() {
+pub fn matches_end_of_rejects_non_suffix_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.ends(p, "hello world") |> should.be_false
+  ptern.matches_end_of(p, "hello world") |> should.be_false
 }
 
-pub fn contained_in_test() {
+pub fn matches_in_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.contained_in(p, "say hello world") |> should.be_true
+  ptern.matches_in(p, "say hello world") |> should.be_true
 }
 
-pub fn contained_in_rejects_absent_test() {
+pub fn matches_in_rejects_absent_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.contained_in(p, "goodbye world") |> should.be_false
+  ptern.matches_in(p, "goodbye world") |> should.be_false
 }
 
-pub fn case_insensitive_matches_test() {
+pub fn case_insensitive_matches_all_of_test() {
   let assert Ok(p) = ptern.compile("@case-insensitive = true\n'hello'")
-  ptern.matches(p, "HELLO") |> should.be_true
+  ptern.matches_all_of(p, "HELLO") |> should.be_true
 }
 
-pub fn digit_pattern_matches_test() {
+pub fn digit_pattern_matches_all_of_test() {
   let assert Ok(p) = ptern.compile("%Digit * 4")
-  ptern.matches(p, "2026") |> should.be_true
+  ptern.matches_all_of(p, "2026") |> should.be_true
 }
 
 pub fn digit_pattern_rejects_letters_test() {
   let assert Ok(p) = ptern.compile("%Digit * 4")
-  ptern.matches(p, "abcd") |> should.be_false
+  ptern.matches_all_of(p, "abcd") |> should.be_false
 }
 
 pub fn alternation_matches_either_test() {
   let assert Ok(p) = ptern.compile("'cat' | 'dog'")
-  ptern.matches(p, "cat") |> should.be_true
-  ptern.matches(p, "dog") |> should.be_true
-  ptern.matches(p, "fish") |> should.be_false
+  ptern.matches_all_of(p, "cat") |> should.be_true
+  ptern.matches_all_of(p, "dog") |> should.be_true
+  ptern.matches_all_of(p, "fish") |> should.be_false
 }
 
 // ---------------------------------------------------------------------------
-// match (named captures)
+// match_first_in / match_all_of / match_start_of / match_end_of
+// match_next_in / match_all_in
 // ---------------------------------------------------------------------------
 
-pub fn match_returns_none_on_no_match_test() {
+pub fn match_first_in_returns_none_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.match(p, "goodbye") |> should.equal(None)
+  ptern.match_first_in(p, "goodbye") |> should.equal(None)
 }
 
-pub fn match_returns_some_on_match_test() {
+pub fn match_first_in_returns_some_test() {
   let assert Ok(p) = ptern.compile("'hello'")
-  ptern.match(p, "hello") |> should.not_equal(None)
+  ptern.match_first_in(p, "say hello world") |> should.not_equal(None)
 }
 
-pub fn match_returns_named_captures_test() {
+pub fn match_first_in_index_and_length_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  let assert Some(occ) = ptern.match_first_in(p, "say hello world")
+  occ.index |> should.equal(4)
+  occ.length |> should.equal(5)
+}
+
+pub fn match_first_in_named_captures_test() {
   let assert Ok(p) = ptern.compile("%Digit * 4 as year")
-  let assert Some(groups) = ptern.match(p, "2026")
-  dict.get(groups, "year") |> should.equal(Ok("2026"))
+  let assert Some(occ) = ptern.match_first_in(p, "2026")
+  dict.get(occ.captures, "year") |> should.equal(Ok("2026"))
 }
 
-pub fn match_iso_date_captures_test() {
+pub fn match_first_in_iso_date_captures_test() {
   let src =
     "yyyy = %Digit * 4;\n"
     <> "mm = ('0' '1'..'9') | ('1' '0'..'2');\n"
     <> "dd = ('0' '1'..'9') | ('1'..'2' %Digit) | ('3' '0'..'1');\n"
     <> "{yyyy} as year '-' {mm} as month '-' {dd} as day"
   let assert Ok(p) = ptern.compile(src)
-  let assert Some(groups) = ptern.match(p, "2026-07-04")
-  dict.get(groups, "year") |> should.equal(Ok("2026"))
-  dict.get(groups, "month") |> should.equal(Ok("07"))
-  dict.get(groups, "day") |> should.equal(Ok("04"))
+  let assert Some(occ) = ptern.match_first_in(p, "2026-07-04")
+  dict.get(occ.captures, "year") |> should.equal(Ok("2026"))
+  dict.get(occ.captures, "month") |> should.equal(Ok("07"))
+  dict.get(occ.captures, "day") |> should.equal(Ok("04"))
+}
+
+pub fn match_all_of_returns_none_on_partial_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.match_all_of(p, "hello world") |> should.equal(None)
+}
+
+pub fn match_all_of_returns_occurrence_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  let assert Some(occ) = ptern.match_all_of(p, "hello")
+  occ.index |> should.equal(0)
+  occ.length |> should.equal(5)
+}
+
+pub fn match_start_of_returns_none_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.match_start_of(p, "say hello") |> should.equal(None)
+}
+
+pub fn match_start_of_returns_occurrence_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  let assert Some(occ) = ptern.match_start_of(p, "hello world")
+  occ.index |> should.equal(0)
+  occ.length |> should.equal(5)
+}
+
+pub fn match_end_of_returns_none_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.match_end_of(p, "hello world") |> should.equal(None)
+}
+
+pub fn match_end_of_returns_occurrence_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  let assert Some(occ) = ptern.match_end_of(p, "say hello")
+  occ.index |> should.equal(4)
+  occ.length |> should.equal(5)
+}
+
+pub fn match_next_in_resumes_after_index_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  let assert Some(first) = ptern.match_next_in(p, "hello hello", 0)
+  first.index |> should.equal(0)
+  let assert Some(second) = ptern.match_next_in(p, "hello hello", first.index + first.length)
+  second.index |> should.equal(6)
+}
+
+pub fn match_next_in_returns_none_past_end_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.match_next_in(p, "hello", 1) |> should.equal(None)
+}
+
+pub fn match_all_in_returns_all_occurrences_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  let occs = ptern.match_all_in(p, "hello say hello")
+  list.length(occs) |> should.equal(2)
+  let assert [first, second] = occs
+  first.index |> should.equal(0)
+  second.index |> should.equal(10)
+}
+
+pub fn match_all_in_returns_empty_list_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.match_all_in(p, "goodbye") |> should.equal([])
 }
 
 // ---------------------------------------------------------------------------
