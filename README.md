@@ -2,7 +2,7 @@
 
 Martin Nordberg - 2026-04-04
 
-## What's with the name?
+## What's With the Name?
 
 "PT+ERN" is a "backandforthronym":
 
@@ -15,29 +15,27 @@ Now I have two problems."
 
 Or, if you prefer a recursive acronym:
 
-* *PT+ERN* - *P*tern's *T*ypescript *T*agged *T*emplates *E*nable *R*eading *N*aturally
+* *PT+ERN* - *P*tern's a *T*ext *T*ranslation *T*ool *T*hat *E*nables *R*eading *N*aturally
 
 And note that "ptern" (we pronounce it "turn") could be an out-of-the-ordinary abbreviation
 for the word "pattern".
 
 
-## Enough fluff! Show me.
+## Enough Fluff! Show Me.
 
 Here is an example Ptern string matching pattern (just a "ptern" from now on):
 
-``` typescript
-const isoDate = ptern`
-  yyyy = %Digit * 4;
-  mm = '0' '1'..'9' | '1' '0'..'2';
-  dd = '0' '1'..'9' | '1'..'2' %Digit | '3' '0'..'1';
-  {yyyy} as year '-' {mm} as month '-' {dd} as day
-`
+```
+yyyy = %Digit * 4;
+mm = '0' '1'..'9' | '1' '0'..'2';
+dd = '0' '1'..'9' | '1'..'2' %Digit | '3' '0'..'1';
+{yyyy} as year '-' {mm} as month '-' {dd} as day
 ```
 
 It is way more verbose than the corresponding regular expression, but it is also far more readable.
 We think that's true even if you haven't yet learned the Ptern grammar.
 
-Here's how a ptern can be put to use.
+Here's how a ptern can be put to use (shown using the TypeScript API — see [Language Support](#language-support)):
 
 ```
 isoDate.matches("2026-07-04")
@@ -67,6 +65,30 @@ isoDate.minLength()
 ```
 
 
+## Language Support
+
+Ptern is designed to be language-independent. The pattern language and its grammar are fully defined in this document; each language binding wraps the same compiled core.
+
+### TypeScript / JavaScript
+
+```typescript
+import { ptern } from "./index.ts"
+
+const isoDate = ptern`
+  yyyy = %Digit * 4;
+  mm = ('0' '1'..'9') | ('1' '0'..'2');
+  dd = ('0' '1'..'9') | ('1'..'2' %Digit) | ('3' '0'..'1');
+  {yyyy} as year '-' {mm} as month '-' {dd} as day
+`
+
+isoDate.matches("2026-07-04")          // true
+isoDate.match("2026-07-04")            // { year: "2026", month: "07", day: "04" }
+isoDate.maxLength()                    // 10
+```
+
+*More language bindings are planned.*
+
+
 ## An Overview of Ptern
 
 ### Ptern Character Sequences
@@ -91,14 +113,14 @@ isoDate.minLength()
 
 | Syntax | Meaning | Example |
 |--------|---------|---------|
-| <ptern1> <ptern2> | Sequence of smaller patterns. The space character between is required to enforce readability. | %Alpha %Alnum | 
+| <ptern1>\ <ptern2> | Sequence of smaller patterns. The space character between is required to enforce readability. | %Alpha %Alnum | 
 | <ptern> * <integer> | Fixed repetition count. | '-' * 3 |
 | <ptern> * <integer>..<integer> | Bounded repetition count. | '-' * 3..10 |
 | <ptern> * <integer>..? | Unbounded repetition (at least N times, no upper limit). | %Digit * 1..? |
 | <ptern1> \| <ptern2> | Alternatives. | '0'..'9' \| '1' '0'..'2' |
 | ( <ptern> ) | Precedence override.| 'A'..'Z' ('0' \| '1') |
-| <ptern> as <identifier> | Subpattern captured by name during matching. | %Digit * 4 as year |
-| <ptern1> excluding <ptern2> | Set difference: characters in ptern1 but not ptern2. Both sides must be single-character patterns and ptern2 must be a subset of ptern1 (enforced after parsing). | %Digit excluding '8'..'9' |
+| <ptern>\ as\ <identifier> | Subpattern captured by name during matching. | %Digit * 4 as year |
+| <ptern1>\ excluding\ <ptern2> | Set difference: characters in ptern1 but not ptern2. Both sides must be single-character patterns and ptern2 must be a subset of ptern1 (enforced after parsing). | %Digit excluding '8'..'9' |
 | <identifier> = <ptern> ; | Definition of a subpattern. | barcode = %Digit * 20; |
 | { <identifier> } | If `identifier` names a definition: subpattern interpolation (pattern match). If `identifier` names a capture: backreference — matches the exact text captured at the earlier point, as if it were a literal string. [Also adds implicit surrounding ( ) .] | {barcode} \| "No SKU" |
 
@@ -132,53 +154,51 @@ any subpattern definitions.
 ### The Lexical Tokens of Ptern Defined as Pterns
 
 ```
-const onePternToken = ptern`
-  Whitespace            =  (' '|'\t'|'\r'|'\n') * 1..? ;
-  Comment               =  '#' (%Any excluding ('\r'|'\n')) * 0..? ;
-  SingleQuotedLiteral   =  "'" (%Any excluding ("'"|'\r'|'\n')) * 1..? "'" ;
-  DoubleQuotedLiteral   =  '"' (%Any excluding ('"'|'\r'|'\n')) * 1..? '"' ;
-  CharacterClass        =  '%' 'A'..'Z' %Alpha * 0..31 ;
-  Integer               =  %Digit * 1..5 ;
-  RangeOperator         =  '..' ;
-  LeftBrace             =  '{' ;
-  RightBrace            =  '}' ;
-  AlternativeOperator   =  '|' ;
-  LeftParenthesis       =  '(' ;
-  RightParenthesis      =  ')' ;
-  AssignmentOperator    =  '=' ;
-  Asterisk              =  '*' ;
-  Semicolon             =  ';' ;
-  AsKeyword             =  'as' ;
-  ExcludingKeyword      =  'excluding' ;
-  TrueKeyword           =  'true' ;
-  FalseKeyword          =  'false' ;
-  AtSign                =  '@' ;
-  QuestionMark          =  '?' ;
-  Identifier            =  %Alpha (%Alnum | '-') * 0..63 ;
+Whitespace            =  (' '|'\t'|'\r'|'\n') * 1..? ;
+Comment               =  '#' (%Any excluding ('\r'|'\n')) * 0..? ;
+SingleQuotedLiteral   =  "'" (%Any excluding ("'"|'\r'|'\n')) * 1..? "'" ;
+DoubleQuotedLiteral   =  '"' (%Any excluding ('"'|'\r'|'\n')) * 1..? '"' ;
+CharacterClass        =  '%' 'A'..'Z' %Alpha * 0..31 ;
+Integer               =  %Digit * 1..5 ;
+RangeOperator         =  '..' ;
+LeftBrace             =  '{' ;
+RightBrace            =  '}' ;
+AlternativeOperator   =  '|' ;
+LeftParenthesis       =  '(' ;
+RightParenthesis      =  ')' ;
+AssignmentOperator    =  '=' ;
+Asterisk              =  '*' ;
+Semicolon             =  ';' ;
+AsKeyword             =  'as' ;
+ExcludingKeyword      =  'excluding' ;
+TrueKeyword           =  'true' ;
+FalseKeyword          =  'false' ;
+AtSign                =  '@' ;
+QuestionMark          =  '?' ;
+Identifier            =  %Alpha (%Alnum | '-') * 0..63 ;
 
-  Whitespace
-  | Comment
-  | AsKeyword
-  | AtSign
-  | ExcludingKeyword
-  | QuestionMark
-  | FalseKeyword
-  | TrueKeyword
-  | AlternativeOperator
-  | AssignmentOperator
-  | Asterisk
-  | CharacterClass
-  | DoubleQuotedLiteral
-  | Identifier
-  | Integer
-  | LeftBrace
-  | LeftParenthesis
-  | RangeOperator
-  | RightBrace
-  | RightParenthesis
-  | Semicolon
-  | SingleQuotedLiteral
-`
+Whitespace
+| Comment
+| AsKeyword
+| AtSign
+| ExcludingKeyword
+| QuestionMark
+| FalseKeyword
+| TrueKeyword
+| AlternativeOperator
+| AssignmentOperator
+| Asterisk
+| CharacterClass
+| DoubleQuotedLiteral
+| Identifier
+| Integer
+| LeftBrace
+| LeftParenthesis
+| RangeOperator
+| RightBrace
+| RightParenthesis
+| Semicolon
+| SingleQuotedLiteral
 ```
 
 ### Character Class Identifiers
