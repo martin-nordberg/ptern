@@ -153,7 +153,7 @@ class PternImpl implements Ptern {
 export function compile(source: string): Ptern {
   // Dynamic import to avoid hard-coding the build path at module load time.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const lib = require("./build/dev/javascript/ptern/ptern.mjs");
+  const lib = require("./ptern-gleam/build/dev/javascript/ptern/ptern.mjs");
   const result = lib.compile(source) as GleamResult;
 
   if (!result.isOk()) {

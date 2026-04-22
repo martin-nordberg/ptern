@@ -11,23 +11,28 @@ The public API of a compiled ptern (the `Ptern` interface in `index.ts`) include
 ## Commands
 
 ```sh
-gleam build          # Build the Gleam library to build/dev/javascript/
+# Run from the ptern-gleam/ subdirectory:
+gleam build          # Build the Gleam library to ptern-gleam/build/dev/javascript/
 gleam test           # Run all Gleam tests
 gleam run            # Run src/ptern.gleam main
 gleam check          # Type-check without building
 gleam add <package>  # Add a dependency
-bun index.ts         # Run the TypeScript wrapper directly (requires gleam build first)
+
+# Run from the repo root:
+bun index.ts         # Run the TypeScript wrapper (requires gleam build first)
 ```
 
-The project targets JavaScript only (`target = "javascript"` in `gleam.toml`) and runs on Bun.
+The Gleam project targets JavaScript only (`target = "javascript"` in `ptern-gleam/gleam.toml`) and runs on Bun.
 
 ## Project Structure
 
-- `src/ptern.gleam` — Gleam library entry point; exposes `compile/1`
-- `index.ts` — TypeScript public API: `ptern` tagged template literal, `compile()`, and the `Ptern` interface; wraps the compiled Gleam output
-- `test/ptern_test.gleam` — test entry point (uses gleeunit)
-- `gleam.toml` — project manifest, dependencies, and JavaScript target config
-- `build/` — generated output (gitignored)
+- `ptern-gleam/` — Gleam implementation (self-contained Gleam project)
+  - `src/ptern.gleam` — library entry point; exposes `compile/1`
+  - `src/lexer/`, `src/parser/`, `src/semantic/`, `src/codegen/` — pipeline stages
+  - `test/` — gleeunit test suite
+  - `gleam.toml` — Gleam project manifest
+  - `build/` — generated JavaScript output (gitignored)
+- `index.ts` — TypeScript public API: `ptern` tagged template literal, `compile()`, and the `Ptern` interface; loads compiled output from `ptern-gleam/build/`
 
 ## Ptern Language
 
