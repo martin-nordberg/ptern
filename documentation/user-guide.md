@@ -63,7 +63,7 @@ any subpattern definitions.
 |-----------------------------------|-----------------|---------|---------|
 | `!case-insensitive`               | `true`, `false` | `false` | When `true`, literal strings and character ranges match both uppercase and lowercase. |
 | `!multiline`                      | `true`, `false` | `false` | When `true`, enables multiline mode: `@line-start` matches the start of each line and `@line-end` matches the end of each line rather than the start/end of the whole string. Using `@line-start` or `@line-end` anywhere in a pattern also enables this automatically. |
-| `!replacements-preserve-matching` | `true`, `false` | `false` | When `true`, each value supplied to a `replace*` call is validated against the capture's own subpattern before substitution. Throws `ReplacementError` if the value would not match. |
+| `!replacements-ignore-matching`   | `true`, `false` | `false` | When `true`, skips validation of replacement values against their capture subpatterns. By default (`false`) each value supplied to a `replace*` call is validated and a `ReplacementError` is thrown if the value would not match. |
 
 
 ## Ptern Language Structure

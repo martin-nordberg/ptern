@@ -35,7 +35,7 @@ interface GleamCompiledPattern {
   flags: string;
   min_length: number;
   max_length: GleamOption;
-  preserve_matching: boolean;
+  ignore_matching: boolean;
   capture_validators: unknown; // Gleam List(#(String, String))
 }
 
@@ -79,8 +79,8 @@ export interface Ptern {
   matchAllIn(input: string): MatchOccurrence[];
   /**
    * Replace the match if the entire input matches, otherwise return input unchanged.
-   * Throws `ReplacementError` if `!replacements-preserve-matching = true` and a value
-   * does not satisfy the capture's subpattern.
+   * Throws `ReplacementError` if a replacement value does not satisfy the capture's
+   * subpattern. Set `!replacements-ignore-matching = true` to disable this check.
    */
   replaceAllOf(input: string, replacements: MatchResult): string;
   /** Replace the match at the start of input, otherwise return input unchanged. */
@@ -125,7 +125,7 @@ class PternImpl implements Ptern {
   private readonly _containsG: RegExp;
   private readonly _min: number;
   private readonly _max: number | null;
-  private readonly _preserveMatching: boolean;
+  private readonly _ignoreMatching: boolean;
   private readonly _captureValidators: Map<string, RegExp>;
 
   constructor(
@@ -133,7 +133,7 @@ class PternImpl implements Ptern {
     flags: string,
     minLen: number,
     maxLen: number | null,
-    preserveMatching: boolean,
+    ignoreMatching: boolean,
     captureValidators: Map<string, RegExp>,
   ) {
     const df = flags.includes("d") ? flags : flags + "d";
@@ -144,12 +144,12 @@ class PternImpl implements Ptern {
     this._containsG = new RegExp(source, df.includes("g") ? df : df + "g");
     this._min = minLen;
     this._max = maxLen;
-    this._preserveMatching = preserveMatching;
+    this._ignoreMatching = ignoreMatching;
     this._captureValidators = captureValidators;
   }
 
   private validateReplacements(replacements: MatchResult): void {
-    if (!this._preserveMatching) return;
+    if (this._ignoreMatching) return;
     for (const [name, value] of Object.entries(replacements)) {
       const re = this._captureValidators.get(name);
       if (re !== undefined && !re.test(value)) {
@@ -407,7 +407,7 @@ export function compile(source: string): Ptern {
     cvEntries.map(([name, fragment]) => [name, new RegExp(`^(?:${fragment})$`, df)]),
   );
 
-  return new PternImpl(cp.source, cp.flags, cp.min_length, maxLen, cp.preserve_matching, captureValidators);
+  return new PternImpl(cp.source, cp.flags, cp.min_length, maxLen, cp.ignore_matching, captureValidators);
 }
 
 // ---------------------------------------------------------------------------

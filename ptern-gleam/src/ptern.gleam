@@ -45,7 +45,7 @@ pub opaque type Ptern {
     contains_g_re: regex.Regex,
     min_len: Int,
     max_len: Option(Int),
-    preserve_matching: Bool,
+    ignore_matching: Bool,
     capture_validators: dict.Dict(String, regex.Regex),
   )
 }
@@ -82,7 +82,7 @@ pub fn compile(source: String) -> Result(Ptern, CompileError) {
         contains_g_re: regex.make(src, g_flg),
         min_len: bounds.min,
         max_len: bounds.max,
-        preserve_matching: compiled.preserve_matching,
+        ignore_matching: compiled.ignore_matching,
         capture_validators: build_capture_validators(
           compiled.capture_validators,
           d_flg,
@@ -177,9 +177,9 @@ fn validate_replacements(
   ptern: Ptern,
   replacements: dict.Dict(String, String),
 ) -> Result(Nil, ReplacementError) {
-  case ptern.preserve_matching {
-    False -> Ok(Nil)
-    True ->
+  case ptern.ignore_matching {
+    True -> Ok(Nil)
+    False ->
       dict.fold(replacements, Ok(Nil), fn(acc, name, value) {
         case acc {
           Error(_) -> acc
@@ -202,8 +202,8 @@ fn validate_replacements(
 // ---------------------------------------------------------------------------
 
 /// Replace the match if the entire input matches, otherwise return input unchanged.
-/// Returns `Error(InvalidReplacementValue(...))` when `@replacements-preserve-matching = true`
-/// and a replacement value does not match the capture's subpattern.
+/// Returns `Error(InvalidReplacementValue(...))` when a replacement value does not match
+/// the capture's subpattern (unless `!replacements-ignore-matching = true` is set).
 pub fn replace_all_of(
   ptern: Ptern,
   input: String,

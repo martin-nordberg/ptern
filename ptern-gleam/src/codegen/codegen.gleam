@@ -22,8 +22,8 @@ pub type CompiledPtern {
     source: String,
     /// The regex flags to use, always including `"v"` (Unicode sets mode).
     flags: String,
-    /// Whether `!replacements-preserve-matching = true` was set.
-    preserve_matching: Bool,
+    /// Whether `!replacements-ignore-matching = true` was set.
+    ignore_matching: Bool,
     /// Per-capture regex fragments: [(captureName, fragment), ...].
     /// Each fragment is suitable for wrapping as `^(?:fragment)$` to validate a replacement value.
     capture_validators: List(#(String, String)),
@@ -33,11 +33,11 @@ pub type CompiledPtern {
 /// Compile a semantically-validated Ptern AST into a JavaScript regex.
 pub fn compile(ptern: ParsedPtern) -> CompiledPtern {
   let flags = determine_flags(ptern)
-  let preserve = determine_preserve_matching(ptern.annotations)
+  let ignore = determine_ignore_matching(ptern.annotations)
   let defs = compile_definitions(ptern.definitions)
   let source = compile_expression(ptern.body, defs)
   let validators = collect_capture_validators(ptern.body, defs)
-  CompiledPtern(source, flags, preserve, validators)
+  CompiledPtern(source, flags, ignore, validators)
 }
 
 // ---------------------------------------------------------------------------
@@ -91,9 +91,9 @@ fn has_line_boundary_in_item(item: RangeItem) -> Bool {
   }
 }
 
-fn determine_preserve_matching(annotations: List(ast.Annotation)) -> Bool {
+fn determine_ignore_matching(annotations: List(ast.Annotation)) -> Bool {
   list.any(annotations, fn(a) {
-    a.name == "replacements-preserve-matching" && a.value
+    a.name == "replacements-ignore-matching" && a.value
   })
 }
 

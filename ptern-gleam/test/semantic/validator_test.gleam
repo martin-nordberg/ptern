@@ -163,7 +163,7 @@ pub fn unknown_annotation_test() {
 }
 
 pub fn replacements_preserve_matching_annotation_accepted_test() {
-  validate("!replacements-preserve-matching = true\n'x'")
+  validate("!replacements-ignore-matching = true\n'x'")
   |> should.equal([])
 }
 

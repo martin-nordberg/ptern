@@ -274,7 +274,8 @@ pub fn replace_end_of_no_match_test() {
 }
 
 pub fn replace_first_in_basic_test() {
-  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
   ptern.replace_first_in(
     p,
     "event in 2026, repeated in 2025",
@@ -284,31 +285,36 @@ pub fn replace_first_in_basic_test() {
 }
 
 pub fn replace_first_in_no_match_test() {
-  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
   ptern.replace_first_in(p, "no digits here", dict.from_list([#("year", "YYYY")]))
   |> should.equal(Ok("no digits here"))
 }
 
 pub fn replace_next_in_basic_test() {
-  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
   ptern.replace_next_in(p, "2026 and 2025", 7, dict.from_list([#("year", "YYYY")]))
   |> should.equal(Ok("2026 and YYYY"))
 }
 
 pub fn replace_next_in_no_match_test() {
-  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
   ptern.replace_next_in(p, "2026", 1, dict.from_list([#("year", "YYYY")]))
   |> should.equal(Ok("2026"))
 }
 
 pub fn replace_all_in_basic_test() {
-  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
   ptern.replace_all_in(p, "2026 and 2025", dict.from_list([#("year", "YYYY")]))
   |> should.equal(Ok("YYYY and YYYY"))
 }
 
 pub fn replace_all_in_no_match_test() {
-  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
   ptern.replace_all_in(p, "no digits here", dict.from_list([#("year", "YYYY")]))
   |> should.equal(Ok("no digits here"))
 }
@@ -324,7 +330,10 @@ pub fn replace_multiple_captures_test() {
 }
 
 pub fn replace_all_in_multiple_captures_test() {
-  let assert Ok(p) = ptern.compile("%Digit * 4 as year '-' %Digit * 2 as month")
+  let assert Ok(p) =
+    ptern.compile(
+      "!replacements-ignore-matching = true\n%Digit * 4 as year '-' %Digit * 2 as month",
+    )
   ptern.replace_all_in(
     p,
     "2026-07 and 2025-03",
@@ -334,45 +343,40 @@ pub fn replace_all_in_multiple_captures_test() {
 }
 
 // ---------------------------------------------------------------------------
-// !replacements-preserve-matching
+// !replacements-ignore-matching
 // ---------------------------------------------------------------------------
 
-pub fn preserve_matching_valid_replacement_test() {
-  let assert Ok(p) =
-    ptern.compile("!replacements-preserve-matching = true\n%Digit * 4 as year")
+pub fn replacement_validates_by_default_valid_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
   ptern.replace_first_in(p, "event 2026", dict.from_list([#("year", "2027")]))
   |> should.equal(Ok("event 2027"))
 }
 
-pub fn preserve_matching_invalid_replacement_test() {
-  let assert Ok(p) =
-    ptern.compile("!replacements-preserve-matching = true\n%Digit * 4 as year")
+pub fn replacement_validates_by_default_invalid_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
   ptern.replace_first_in(p, "event 2026", dict.from_list([#("year", "202")]))
   |> should.equal(Error(ptern.InvalidReplacementValue("year", "202")))
 }
 
-pub fn preserve_matching_without_annotation_ignores_value_test() {
-  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+pub fn ignore_matching_annotation_skips_validation_test() {
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
   ptern.replace_first_in(p, "event 2026", dict.from_list([#("year", "abc")]))
   |> should.equal(Ok("event abc"))
 }
 
-pub fn preserve_matching_interpolated_capture_test() {
+pub fn replacement_validates_interpolated_capture_test() {
   let assert Ok(p) =
-    ptern.compile(
-      "!replacements-preserve-matching = true\nyyyy = %Digit * 4;\n{yyyy} as year",
-    )
+    ptern.compile("yyyy = %Digit * 4;\n{yyyy} as year")
   ptern.replace_first_in(p, "2026", dict.from_list([#("year", "2027")]))
   |> should.equal(Ok("2027"))
   ptern.replace_first_in(p, "2026", dict.from_list([#("year", "abc")]))
   |> should.equal(Error(ptern.InvalidReplacementValue("year", "abc")))
 }
 
-pub fn preserve_matching_case_insensitive_flag_propagated_test() {
+pub fn replacement_validation_case_insensitive_flag_propagated_test() {
   let assert Ok(p) =
-    ptern.compile(
-      "!replacements-preserve-matching = true\n!case-insensitive = true\n'a'..'z' * 4 as word",
-    )
+    ptern.compile("!case-insensitive = true\n'a'..'z' * 4 as word")
   ptern.replace_first_in(p, "stop", dict.from_list([#("word", "HALT")]))
   |> should.equal(Ok("HALT"))
 }

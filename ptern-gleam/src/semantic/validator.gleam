@@ -29,7 +29,7 @@ pub fn validate(ptern: ParsedPtern) -> List(SemanticError) {
 // ---------------------------------------------------------------------------
 
 fn known_annotation_names() -> List(String) {
-  ["case-insensitive", "multiline", "replacements-preserve-matching"]
+  ["case-insensitive", "multiline", "replacements-ignore-matching"]
 }
 
 fn known_position_assertion_names() -> List(String) {
