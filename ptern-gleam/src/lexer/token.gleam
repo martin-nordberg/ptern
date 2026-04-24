@@ -63,14 +63,17 @@ pub type Token {
   Excluding
 
   /// The keyword `true`, used as an annotation value:
-  /// `@case-insensitive = true`.
+  /// `!case-insensitive = true`.
   TrueKeyword
 
   /// The keyword `false`, used as an annotation value:
-  /// `@case-insensitive = false`.
+  /// `!case-insensitive = false`.
   FalseKeyword
 
-  /// `@` — introduces an annotation, e.g. `@case-insensitive = true`.
+  /// `!` — introduces an annotation, e.g. `!case-insensitive = true`.
+  Bang
+
+  /// `@` — reserved for future use (zero-width position assertions).
   At
 
   /// `?` — used as the upper bound of an unbounded repetition, e.g. `* 1..?`.

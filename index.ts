@@ -79,7 +79,7 @@ export interface Ptern {
   matchAllIn(input: string): MatchOccurrence[];
   /**
    * Replace the match if the entire input matches, otherwise return input unchanged.
-   * Throws `ReplacementError` if `@replacements-preserve-matching = true` and a value
+   * Throws `ReplacementError` if `!replacements-preserve-matching = true` and a value
    * does not satisfy the capture's subpattern.
    */
   replaceAllOf(input: string, replacements: MatchResult): string;

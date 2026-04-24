@@ -366,7 +366,7 @@ pub fn parse_definition_test() {
 // ---------------------------------------------------------------------------
 
 pub fn parse_annotation_true_test() {
-  parse("@case-insensitive = true\n'x'")
+  parse("!case-insensitive = true\n'x'")
   |> should.equal(
     Ok(
       ParsedPtern(
@@ -386,7 +386,7 @@ pub fn parse_annotation_true_test() {
 }
 
 pub fn parse_annotation_false_test() {
-  parse("@case-insensitive = false\n%Digit")
+  parse("!case-insensitive = false\n%Digit")
   |> should.equal(
     Ok(
       ParsedPtern(

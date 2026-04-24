@@ -3,7 +3,7 @@ import gleam/list
 import gleam/result
 import gleam/string
 import lexer/token.{
-  type LexError, type Token, As, At, Asterisk, CharacterClass, Comment,
+  type LexError, type Token, As, At, Asterisk, Bang, CharacterClass, Comment,
   DoubleQuotedLiteral, Equals, Excluding, FalseKeyword, Identifier, Integer,
   LeftBrace, LeftParen, AlternativeOperator, QuestionMark, RangeOperator,
   RightBrace, RightParen, Semicolon, SingleQuotedLiteral, TrueKeyword,
@@ -38,6 +38,7 @@ fn do_lex(input: String, acc: List(Token)) -> Result(List(Token), LexError) {
         "\"" -> lex_double_quoted(rest, "", acc)
         "%" -> lex_character_class(rest, acc)
         "." -> lex_range_operator(rest, acc)
+        "!" -> do_lex(rest, [Bang, ..acc])
         "@" -> do_lex(rest, [At, ..acc])
         "?" -> do_lex(rest, [QuestionMark, ..acc])
         "*" -> do_lex(rest, [Asterisk, ..acc])

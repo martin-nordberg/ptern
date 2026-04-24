@@ -30,11 +30,11 @@ pub fn default_flags_are_v_test() {
 }
 
 pub fn case_insensitive_true_adds_i_flag_test() {
-  flags("@case-insensitive = true\n'x'") |> should.equal("vi")
+  flags("!case-insensitive = true\n'x'") |> should.equal("vi")
 }
 
 pub fn case_insensitive_false_no_i_flag_test() {
-  flags("@case-insensitive = false\n'x'") |> should.equal("v")
+  flags("!case-insensitive = false\n'x'") |> should.equal("v")
 }
 
 // ---------------------------------------------------------------------------

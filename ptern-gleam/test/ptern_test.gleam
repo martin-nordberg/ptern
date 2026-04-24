@@ -107,7 +107,7 @@ pub fn matches_in_rejects_absent_test() {
 }
 
 pub fn case_insensitive_matches_all_of_test() {
-  let assert Ok(p) = ptern.compile("@case-insensitive = true\n'hello'")
+  let assert Ok(p) = ptern.compile("!case-insensitive = true\n'hello'")
   ptern.matches_all_of(p, "HELLO") |> should.be_true
 }
 
@@ -334,19 +334,19 @@ pub fn replace_all_in_multiple_captures_test() {
 }
 
 // ---------------------------------------------------------------------------
-// @replacements-preserve-matching
+// !replacements-preserve-matching
 // ---------------------------------------------------------------------------
 
 pub fn preserve_matching_valid_replacement_test() {
   let assert Ok(p) =
-    ptern.compile("@replacements-preserve-matching = true\n%Digit * 4 as year")
+    ptern.compile("!replacements-preserve-matching = true\n%Digit * 4 as year")
   ptern.replace_first_in(p, "event 2026", dict.from_list([#("year", "2027")]))
   |> should.equal(Ok("event 2027"))
 }
 
 pub fn preserve_matching_invalid_replacement_test() {
   let assert Ok(p) =
-    ptern.compile("@replacements-preserve-matching = true\n%Digit * 4 as year")
+    ptern.compile("!replacements-preserve-matching = true\n%Digit * 4 as year")
   ptern.replace_first_in(p, "event 2026", dict.from_list([#("year", "202")]))
   |> should.equal(Error(ptern.InvalidReplacementValue("year", "202")))
 }
@@ -360,7 +360,7 @@ pub fn preserve_matching_without_annotation_ignores_value_test() {
 pub fn preserve_matching_interpolated_capture_test() {
   let assert Ok(p) =
     ptern.compile(
-      "@replacements-preserve-matching = true\nyyyy = %Digit * 4;\n{yyyy} as year",
+      "!replacements-preserve-matching = true\nyyyy = %Digit * 4;\n{yyyy} as year",
     )
   ptern.replace_first_in(p, "2026", dict.from_list([#("year", "2027")]))
   |> should.equal(Ok("2027"))
@@ -371,7 +371,7 @@ pub fn preserve_matching_interpolated_capture_test() {
 pub fn preserve_matching_case_insensitive_flag_propagated_test() {
   let assert Ok(p) =
     ptern.compile(
-      "@replacements-preserve-matching = true\n@case-insensitive = true\n'a'..'z' * 4 as word",
+      "!replacements-preserve-matching = true\n!case-insensitive = true\n'a'..'z' * 4 as word",
     )
   ptern.replace_first_in(p, "stop", dict.from_list([#("word", "HALT")]))
   |> should.equal(Ok("HALT"))
@@ -566,19 +566,19 @@ pub fn parse_error_unclosed_interpolation_test() {
 // ---------------------------------------------------------------------------
 
 pub fn unknown_annotation_test() {
-  ptern.compile("@typo = true\n'x'")
+  ptern.compile("!typo = true\n'x'")
   |> has_semantic_error(error.UnknownAnnotation("typo"))
   |> should.be_true
 }
 
 pub fn unknown_annotation_wrong_case_test() {
-  ptern.compile("@Case-Insensitive = true\n'x'")
+  ptern.compile("!Case-Insensitive = true\n'x'")
   |> has_semantic_error(error.UnknownAnnotation("Case-Insensitive"))
   |> should.be_true
 }
 
 pub fn duplicate_annotation_test() {
-  ptern.compile("@case-insensitive = true\n@case-insensitive = false\n'x'")
+  ptern.compile("!case-insensitive = true\n!case-insensitive = false\n'x'")
   |> has_semantic_error(error.DuplicateAnnotation("case-insensitive"))
   |> should.be_true
 }

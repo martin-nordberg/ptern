@@ -152,7 +152,7 @@ pub fn time12_invalid_test() {
 // ---------------------------------------------------------------------------
 
 const float_src = "
-  @case-insensitive = true
+  !case-insensitive = true
   digits = %Digit * 1..20;
   exp = 'e' ('+' | '-') * 0..1 {digits} as exponent;
   ('+' | '-') * 0..1 {digits} as integer ('.' {digits}) * 0..1 {exp} * 0..1
@@ -216,7 +216,7 @@ pub fn decimal_2dp_invalid_test() {
 // ---------------------------------------------------------------------------
 
 const hex_src = "
-  @case-insensitive = true
+  !case-insensitive = true
   '0x' %Xdigit * 1..16 as value
 "
 

@@ -45,14 +45,14 @@ fn parse_ptern(s: Stream) -> Result(#(ParsedPtern, Stream), ParseError) {
   Ok(#(ParsedPtern(annotations, definitions, body), s))
 }
 
-// Greedily consume annotations: `@ identifier = true|false`.
+// Greedily consume annotations: `! identifier = true|false`.
 fn parse_annotations(
   s: Stream,
   acc: List(Annotation),
 ) -> Result(#(List(Annotation), Stream), ParseError) {
   let s = stream.skip_trivia(s)
   case stream.peek(s) {
-    Some(token.At) -> {
+    Some(token.Bang) -> {
       use #(ann, s2) <- result.try(parse_annotation(s))
       parse_annotations(s2, [ann, ..acc])
     }
@@ -61,9 +61,9 @@ fn parse_annotations(
 }
 
 fn parse_annotation(s: Stream) -> Result(#(Annotation, Stream), ParseError) {
-  // Consume `@`
+  // Consume `!`
   let #(_, s) = stream.advance(s)
-  // Skip any whitespace between `@` and the name (not expected but tolerated)
+  // Skip any whitespace between `!` and the name (not expected but tolerated)
   let s = stream.skip_trivia(s)
   use #(name, s) <- result.try(expect_identifier(s))
   let s = stream.skip_trivia(s)

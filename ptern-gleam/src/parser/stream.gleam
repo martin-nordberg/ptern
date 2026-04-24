@@ -122,6 +122,7 @@ pub fn token_display(token: Token) -> String {
     token.Excluding -> "excluding"
     token.TrueKeyword -> "true"
     token.FalseKeyword -> "false"
+    token.Bang -> "!"
     token.At -> "@"
     token.QuestionMark -> "?"
     token.Identifier(n) -> n

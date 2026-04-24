@@ -70,7 +70,7 @@ pub fn valid_capture_test() {
 }
 
 pub fn valid_annotation_test() {
-  validate("@case-insensitive = true\n'x'")
+  validate("!case-insensitive = true\n'x'")
   |> should.equal([])
 }
 
@@ -158,17 +158,17 @@ pub fn invalid_exclusion_interpolation_operand_test() {
 // ---------------------------------------------------------------------------
 
 pub fn unknown_annotation_test() {
-  let errs = validate("@typo = true\n'x'")
+  let errs = validate("!typo = true\n'x'")
   errs |> should.equal([UnknownAnnotation("typo")])
 }
 
 pub fn replacements_preserve_matching_annotation_accepted_test() {
-  validate("@replacements-preserve-matching = true\n'x'")
+  validate("!replacements-preserve-matching = true\n'x'")
   |> should.equal([])
 }
 
 pub fn duplicate_annotation_test() {
-  let errs = validate("@case-insensitive = true\n@case-insensitive = false\n'x'")
+  let errs = validate("!case-insensitive = true\n!case-insensitive = false\n'x'")
   errs |> should.equal([DuplicateAnnotation("case-insensitive")])
 }
 

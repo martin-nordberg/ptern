@@ -1,7 +1,7 @@
 import gleeunit/should
 import lexer/lexer
 import lexer/token.{
-  As, At, Asterisk, CharacterClass, Comment, DoubleQuotedLiteral, Equals,
+  As, At, Asterisk, Bang, CharacterClass, Comment, DoubleQuotedLiteral, Equals,
   Excluding, FalseKeyword, Identifier, Integer, LeftBrace, LeftParen,
   AlternativeOperator, QuestionMark, RangeOperator, RightBrace, RightParen,
   Semicolon, SingleQuotedLiteral, TrueKeyword, Whitespace,
@@ -298,6 +298,11 @@ pub fn lex_alternatives_test() {
   )
 }
 
+pub fn lex_bang_test() {
+  lexer.lex("!")
+  |> should.equal(Ok([Bang]))
+}
+
 pub fn lex_at_sign_test() {
   lexer.lex("@")
   |> should.equal(Ok([At]))
@@ -314,10 +319,10 @@ pub fn lex_false_keyword_test() {
 }
 
 pub fn lex_annotation_test() {
-  lexer.lex("@case-insensitive = true")
+  lexer.lex("!case-insensitive = true")
   |> should.equal(
     Ok([
-      At,
+      Bang,
       Identifier("case-insensitive"),
       Whitespace,
       Equals,

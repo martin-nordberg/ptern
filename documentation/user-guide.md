@@ -52,12 +52,12 @@
 ### Annotations
 
 Annotations set compilation options for the whole pattern. They are written
-`@identifier = value` and must appear at the very top of the ptern, before
+`!identifier = value` and must appear at the very top of the ptern, before
 any subpattern definitions.
 
 | Annotation          | Values          | Default | Meaning |
 |---------------------|-----------------|---------|---------|
-| `@case-insensitive` | `true`, `false` | `false` | When `true`, literal strings and character ranges match both uppercase and lowercase. |
+| `!case-insensitive` | `true`, `false` | `false` | When `true`, literal strings and character ranges match both uppercase and lowercase. |
 
 
 ## Ptern Language Structure
@@ -84,6 +84,7 @@ AsKeyword             =  'as' ;
 ExcludingKeyword      =  'excluding' ;
 TrueKeyword           =  'true' ;
 FalseKeyword          =  'false' ;
+Bang                  =  '!' ;
 AtSign                =  '@' ;
 QuestionMark          =  '?' ;
 Identifier            =  %Alpha (%Alnum | '-') * 0..63 ;
@@ -91,6 +92,7 @@ Identifier            =  %Alpha (%Alnum | '-') * 0..63 ;
 Whitespace
 | Comment
 | AsKeyword
+| Bang
 | AtSign
 | ExcludingKeyword
 | QuestionMark
@@ -341,10 +343,10 @@ for rejecting ill-formed patterns.
 
 **Annotations**
 
-- **Unknown annotation name** — an unrecognised annotation (e.g. `@typo = true`)
+- **Unknown annotation name** — an unrecognised annotation (e.g. `!typo = true`)
   is an error.
 - **Wrong annotation value type** — a value of the wrong type for an annotation
-  (e.g. `@case-insensitive = 42`) is an error.
+  (e.g. `!case-insensitive = 42`) is an error.
 - **Duplicate annotation** — the same annotation set more than once in a ptern
   is an error.
 
@@ -419,7 +421,7 @@ ms  = '0'..'5' %Digit;
 #### Ptern
 
 ```
-@case-insensitive = true
+!case-insensitive = true
 digits = %Digit * 1..20;
 exp    = 'e' ('+' | '-') * 0..1 {digits} as exponent;
 ('+' | '-') * 0..1 {digits} as integer ('.' {digits}) * 0..1 {exp} * 0..1
@@ -446,7 +448,7 @@ exp    = 'e' ('+' | '-') * 0..1 {digits} as exponent;
 #### Ptern
 
 ```
-@case-insensitive = true
+!case-insensitive = true
 '0x' %Xdigit * 1..16 as value
 ```
 
