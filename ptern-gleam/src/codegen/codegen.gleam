@@ -8,7 +8,7 @@ import parser/ast.{
   type Atom, type Capture, type Definition, type Exclusion, type Expression,
   type ParsedPtern, type RangeItem, type RepCount, type Repetition, type Sequence,
   Alternation, CharClass, CharRange, Exact, Group, Interpolation, Literal,
-  RepCount, Sequence, SingleAtom, Unbounded,
+  PositionAssertion, RepCount, Sequence, SingleAtom, Unbounded,
 }
 
 // ---------------------------------------------------------------------------
@@ -22,7 +22,7 @@ pub type CompiledPtern {
     source: String,
     /// The regex flags to use, always including `"v"` (Unicode sets mode).
     flags: String,
-    /// Whether `@replacements-preserve-matching = true` was set.
+    /// Whether `!replacements-preserve-matching = true` was set.
     preserve_matching: Bool,
     /// Per-capture regex fragments: [(captureName, fragment), ...].
     /// Each fragment is suitable for wrapping as `^(?:fragment)$` to validate a replacement value.
@@ -32,7 +32,7 @@ pub type CompiledPtern {
 
 /// Compile a semantically-validated Ptern AST into a JavaScript regex.
 pub fn compile(ptern: ParsedPtern) -> CompiledPtern {
-  let flags = determine_flags(ptern.annotations)
+  let flags = determine_flags(ptern)
   let preserve = determine_preserve_matching(ptern.annotations)
   let defs = compile_definitions(ptern.definitions)
   let source = compile_expression(ptern.body, defs)
@@ -44,12 +44,50 @@ pub fn compile(ptern: ParsedPtern) -> CompiledPtern {
 // Flags
 // ---------------------------------------------------------------------------
 
-fn determine_flags(annotations: List(ast.Annotation)) -> String {
+fn determine_flags(ptern: ParsedPtern) -> String {
+  let anns = ptern.annotations
   let case_insensitive =
-    list.any(annotations, fn(a) { a.name == "case-insensitive" && a.value })
-  case case_insensitive {
-    True -> "vi"
-    False -> "v"
+    list.any(anns, fn(a) { a.name == "case-insensitive" && a.value })
+  let multiline =
+    list.any(anns, fn(a) { a.name == "multiline" && a.value })
+    || has_line_boundary_in_defs(ptern.definitions)
+    || has_line_boundary_in_expr(ptern.body)
+  case case_insensitive, multiline {
+    True, True -> "vim"
+    True, False -> "vi"
+    False, True -> "vm"
+    False, False -> "v"
+  }
+}
+
+fn has_line_boundary_in_defs(defs: List(Definition)) -> Bool {
+  list.any(defs, fn(def) { has_line_boundary_in_expr(def.body) })
+}
+
+fn has_line_boundary_in_expr(expr: Expression) -> Bool {
+  let Alternation(seqs) = expr
+  list.any(seqs, has_line_boundary_in_seq)
+}
+
+fn has_line_boundary_in_seq(seq: ast.Sequence) -> Bool {
+  let Sequence(items) = seq
+  list.any(items, has_line_boundary_in_cap)
+}
+
+fn has_line_boundary_in_cap(cap: ast.Capture) -> Bool {
+  has_line_boundary_in_excl(cap.inner.inner)
+}
+
+fn has_line_boundary_in_excl(excl: ast.Exclusion) -> Bool {
+  has_line_boundary_in_item(excl.base)
+}
+
+fn has_line_boundary_in_item(item: RangeItem) -> Bool {
+  case item {
+    SingleAtom(PositionAssertion("line-start")) -> True
+    SingleAtom(PositionAssertion("line-end")) -> True
+    SingleAtom(Group(expr)) -> has_line_boundary_in_expr(expr)
+    _ -> False
   }
 }
 
@@ -264,6 +302,16 @@ fn compile_atom_standalone(atom: Atom, defs: Dict(String, String)) -> String {
     Interpolation(name) ->
       "(?:" <> result.unwrap(dict.get(defs, name), "(?!)") <> ")"
     Group(expr) -> "(?:" <> compile_expression(expr, defs) <> ")"
+    PositionAssertion(name) -> compile_position_assertion(name)
+  }
+}
+
+fn compile_position_assertion(name: String) -> String {
+  case name {
+    "word-start" | "word-end" -> "\\b"
+    "line-start" -> "^"
+    "line-end" -> "$"
+    _ -> "(?!)"
   }
 }
 
@@ -502,7 +550,7 @@ fn interpolations_in_range_item(item: RangeItem) -> List(String) {
 
 fn interpolations_in_atom(atom: Atom) -> List(String) {
   case atom {
-    Literal(_) | CharClass(_) -> []
+    Literal(_) | CharClass(_) | PositionAssertion(_) -> []
     Interpolation(name) -> [name]
     Group(expr) -> interpolations_in_expression(expr)
   }

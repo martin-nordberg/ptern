@@ -5,12 +5,13 @@ import parser/ast.{
   type Atom, type Capture, type Definition, type Exclusion, type Expression,
   type ParsedPtern, type RangeItem, type RepCount, type Repetition, type Sequence,
   Alternation, CharClass, CharRange, Exact, Group, Interpolation, Literal,
-  RepCount, Sequence, SingleAtom,
+  PositionAssertion, RepCount, Sequence, SingleAtom,
 }
 import semantic/error.{
   type SemanticError, CaptureInRepetition, DuplicateAnnotation,
   InvalidEscapeSequence, InvalidExclusionOperand, InvalidRangeEndpoint,
-  InvertedRange, InvertedRepetitionBounds, UnknownAnnotation,
+  InvertedRange, InvertedRepetitionBounds, PositionAssertionInRepetition,
+  UnknownAnnotation, UnknownPositionAssertion,
 }
 
 /// Run all constraint checks on a parsed Ptern, returning every error found.
@@ -28,7 +29,11 @@ pub fn validate(ptern: ParsedPtern) -> List(SemanticError) {
 // ---------------------------------------------------------------------------
 
 fn known_annotation_names() -> List(String) {
-  ["case-insensitive", "replacements-preserve-matching"]
+  ["case-insensitive", "multiline", "replacements-preserve-matching"]
+}
+
+fn known_position_assertion_names() -> List(String) {
+  ["word-start", "word-end", "line-start", "line-end"]
 }
 
 fn validate_annotations(
@@ -81,7 +86,16 @@ fn validate_capture(cap: Capture, inside_rep: Bool) -> List(SemanticError) {
 fn validate_repetition(rep: Repetition, inside_rep: Bool) -> List(SemanticError) {
   let count_errs = case rep.count {
     None -> []
-    Some(rc) -> validate_rep_count(rc)
+    Some(rc) -> {
+      let bounds_errs = validate_rep_count(rc)
+      let assertion_errs = case rep.inner.excluded, rep.inner.base {
+        None, SingleAtom(PositionAssertion(name)) -> [
+          PositionAssertionInRepetition(name),
+        ]
+        _, _ -> []
+      }
+      list.append(bounds_errs, assertion_errs)
+    }
   }
   // Once we enter a counted repetition, all nested captures are errors.
   let sub_inside = case rep.count {
@@ -171,6 +185,11 @@ fn validate_atom(atom: Atom, inside_rep: Bool) -> List(SemanticError) {
     CharClass(_) -> []
     Interpolation(_) -> []
     Group(expr) -> validate_expression(expr, inside_rep)
+    PositionAssertion(name) ->
+      case list.contains(known_position_assertion_names(), name) {
+        True -> []
+        False -> [UnknownPositionAssertion(name)]
+      }
   }
 }
 

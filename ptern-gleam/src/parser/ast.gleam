@@ -15,7 +15,7 @@ pub type ParsedPtern {
   )
 }
 
-/// `@name = true` or `@name = false`.
+/// `!name = true` or `!name = false`.
 pub type Annotation {
   Annotation(name: String, value: Bool)
 }
@@ -79,6 +79,9 @@ pub type Atom {
   Interpolation(name: String)
   /// A grouped sub-expression: `( expression )`.
   Group(inner: Expression)
+  /// A zero-width position assertion: `@word-start`, `@word-end`,
+  /// `@line-start`, `@line-end`.
+  PositionAssertion(name: String)
 }
 
 /// Errors that can occur during parsing.

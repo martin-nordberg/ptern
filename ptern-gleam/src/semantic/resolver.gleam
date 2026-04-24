@@ -202,7 +202,7 @@ fn interpolations_in_range_item(item: ast.RangeItem) -> List(String) {
 
 fn interpolations_in_atom(atom: ast.Atom) -> List(String) {
   case atom {
-    ast.Literal(_) | ast.CharClass(_) -> []
+    ast.Literal(_) | ast.CharClass(_) | ast.PositionAssertion(_) -> []
     Interpolation(name) -> [name]
     Group(expr) -> interpolations_in_expression(expr)
   }
@@ -247,7 +247,7 @@ fn captures_in_range_item(item: ast.RangeItem) -> List(String) {
 
 fn captures_in_atom(atom: ast.Atom) -> List(String) {
   case atom {
-    ast.Literal(_) | ast.CharClass(_) | Interpolation(_) -> []
+    ast.Literal(_) | ast.CharClass(_) | Interpolation(_) | ast.PositionAssertion(_) -> []
     Group(expr) -> captures_in_expression(expr)
   }
 }

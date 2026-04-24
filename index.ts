@@ -386,6 +386,10 @@ export function compile(source: string): Ptern {
             return `Duplicate annotation: ${ev[0]}`;
           case "InvalidEscapeSequence":
             return `Invalid escape sequence: ${ev[0]}`;
+          case "UnknownPositionAssertion":
+            return `Unknown position assertion: ${ev[0]}`;
+          case "PositionAssertionInRepetition":
+            return `Position assertion inside repetition: ${ev[0]}`;
           default:
             return eName;
         }

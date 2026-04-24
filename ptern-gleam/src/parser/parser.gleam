@@ -7,8 +7,8 @@ import parser/ast.{
   type Expression, type ParseError, type ParsedPtern, type RangeItem,
   type RepCount, type RepUpper, type Repetition, type Sequence, Alternation,
   Annotation, Capture, CharClass, CharRange, Definition, Exact, Exclusion,
-  Group, Interpolation, Literal, None as RepNone, ParsedPtern, RepCount,
-  Repetition, Sequence, SingleAtom, Unbounded, UnexpectedEndOfInput,
+  Group, Interpolation, Literal, None as RepNone, ParsedPtern, PositionAssertion,
+  RepCount, Repetition, Sequence, SingleAtom, Unbounded, UnexpectedEndOfInput,
   UnexpectedToken,
 }
 import parser/stream.{type Stream}
@@ -212,6 +212,7 @@ fn starts_capture(tok: Option(token.Token)) -> Bool {
     Some(token.SingleQuotedLiteral(_)) -> True
     Some(token.DoubleQuotedLiteral(_)) -> True
     Some(token.CharacterClass(_)) -> True
+    Some(token.PositionAssertion(_)) -> True
     Some(token.LeftBrace) -> True
     Some(token.LeftParen) -> True
     _ -> False
@@ -349,11 +350,15 @@ fn parse_atom(s: Stream) -> Result(#(Atom, Stream), ParseError) {
       let #(_, s) = stream.advance(s)
       Ok(#(CharClass(name), s))
     }
+    Some(token.PositionAssertion(name)) -> {
+      let #(_, s) = stream.advance(s)
+      Ok(#(PositionAssertion(name), s))
+    }
     Some(token.LeftBrace) -> parse_interpolation(s)
     Some(token.LeftParen) -> parse_group(s)
     Some(tok) ->
       Error(UnexpectedToken(
-        "literal, character class, { or (",
+        "literal, character class, position assertion, { or (",
         stream.token_display(tok),
       ))
     None -> Error(UnexpectedEndOfInput)

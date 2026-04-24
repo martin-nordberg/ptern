@@ -5,9 +5,9 @@ import gleam/string
 import lexer/token.{
   type LexError, type Token, As, At, Asterisk, Bang, CharacterClass, Comment,
   DoubleQuotedLiteral, Equals, Excluding, FalseKeyword, Identifier, Integer,
-  LeftBrace, LeftParen, AlternativeOperator, QuestionMark, RangeOperator,
-  RightBrace, RightParen, Semicolon, SingleQuotedLiteral, TrueKeyword,
-  UnexpectedCharacter, UnterminatedString, Whitespace,
+  LeftBrace, LeftParen, AlternativeOperator, PositionAssertion, QuestionMark,
+  RangeOperator, RightBrace, RightParen, Semicolon, SingleQuotedLiteral,
+  TrueKeyword, UnexpectedCharacter, UnterminatedString, Whitespace,
 }
 
 /// Lex a complete Ptern source string into a flat list of tokens.
@@ -39,7 +39,7 @@ fn do_lex(input: String, acc: List(Token)) -> Result(List(Token), LexError) {
         "%" -> lex_character_class(rest, acc)
         "." -> lex_range_operator(rest, acc)
         "!" -> do_lex(rest, [Bang, ..acc])
-        "@" -> do_lex(rest, [At, ..acc])
+        "@" -> lex_position_assertion(rest, acc)
         "?" -> do_lex(rest, [QuestionMark, ..acc])
         "*" -> do_lex(rest, [Asterisk, ..acc])
         "|" -> do_lex(rest, [AlternativeOperator, ..acc])
@@ -213,6 +213,38 @@ fn lex_character_class_rest(
         False -> do_lex(input, [CharacterClass(name), ..acc])
       }
     Error(_) -> do_lex(input, [CharacterClass(name), ..acc])
+  }
+}
+
+// Called after the `@` sigil has been consumed.
+// Reads the following identifier (letters, digits, hyphens) and produces a
+// PositionAssertion token. A bare `@` with no identifier falls back to At.
+fn lex_position_assertion(
+  input: String,
+  acc: List(Token),
+) -> Result(List(Token), LexError) {
+  case string.pop_grapheme(input) {
+    Error(_) -> do_lex(input, [At, ..acc])
+    Ok(#(char, rest)) ->
+      case is_alpha(char) {
+        False -> do_lex(input, [At, ..acc])
+        True -> lex_position_assertion_rest(rest, char, acc)
+      }
+  }
+}
+
+fn lex_position_assertion_rest(
+  input: String,
+  name: String,
+  acc: List(Token),
+) -> Result(List(Token), LexError) {
+  case string.pop_grapheme(input) {
+    Ok(#(char, rest)) ->
+      case is_alnum(char) || char == "-" {
+        True -> lex_position_assertion_rest(rest, name <> char, acc)
+        False -> do_lex(input, [PositionAssertion(name), ..acc])
+      }
+    Error(_) -> do_lex(input, [PositionAssertion(name), ..acc])
   }
 }
 

@@ -9,7 +9,8 @@ import lexer/lexer
 import lexer/token
 import parser/ast.{
   type Atom, type Expression, type RangeItem, Alternation, CharClass, CharRange,
-  Exact, Group, Interpolation, Literal, RepCount, Sequence, SingleAtom, Unbounded,
+  Exact, Group, Interpolation, Literal, PositionAssertion, RepCount, Sequence,
+  SingleAtom, Unbounded,
 }
 import parser/parser
 import regex
@@ -427,6 +428,7 @@ fn compute_atom_bounds(atom: Atom, defs: Dict(String, Bounds)) -> Bounds {
     Interpolation(name) ->
       result.unwrap(dict.get(defs, name), Bounds(0, Some(0)))
     Group(expr) -> compute_expression_bounds(expr, defs)
+    PositionAssertion(_) -> Bounds(0, Some(0))
   }
 }
 

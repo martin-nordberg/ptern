@@ -45,4 +45,10 @@ pub type SemanticError {
   /// A string literal contains an unrecognised escape sequence.
   /// `seq` is the raw two-character sequence, e.g. `"\\z"`.
   InvalidEscapeSequence(seq: String)
+
+  /// A `@name` position assertion uses an unrecognised name.
+  UnknownPositionAssertion(name: String)
+
+  /// A position assertion (`@word-start` etc.) has a repetition count applied.
+  PositionAssertionInRepetition(name: String)
 }

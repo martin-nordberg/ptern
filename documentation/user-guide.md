@@ -34,6 +34,10 @@
 | <ptern1>\ excluding\ <ptern2> | Set difference: characters in ptern1 but not ptern2. Both sides must be single-character patterns and ptern2 must be a subset of ptern1 (enforced after parsing). | %Digit excluding '8'..'9' |
 | <identifier> = <ptern> ; | Definition of a subpattern. | barcode = %Digit * 20; |
 | { <identifier> } | If `identifier` names a definition: subpattern interpolation (pattern match). If `identifier` names a capture: backreference — matches the exact text captured at the earlier point, as if it were a literal string. [Also adds implicit surrounding ( ) .] | {barcode} \| "No SKU" |
+| @word-start | Zero-width assertion: matches the position at the start of a word (between a non-word and a word character). | @word-start %Alpha * 1..? |
+| @word-end | Zero-width assertion: matches the position at the end of a word (between a word and a non-word character). | %Alpha * 1..? @word-end |
+| @line-start | Zero-width assertion: matches the position at the start of a line. Automatically enables multiline mode. | @line-start %Alpha * 1..? |
+| @line-end | Zero-width assertion: matches the position at the end of a line. Automatically enables multiline mode. | %Alpha * 1..? @line-end |
 
 ### Precedence
 
@@ -55,9 +59,11 @@ Annotations set compilation options for the whole pattern. They are written
 `!identifier = value` and must appear at the very top of the ptern, before
 any subpattern definitions.
 
-| Annotation          | Values          | Default | Meaning |
-|---------------------|-----------------|---------|---------|
-| `!case-insensitive` | `true`, `false` | `false` | When `true`, literal strings and character ranges match both uppercase and lowercase. |
+| Annotation                        | Values          | Default | Meaning |
+|-----------------------------------|-----------------|---------|---------|
+| `!case-insensitive`               | `true`, `false` | `false` | When `true`, literal strings and character ranges match both uppercase and lowercase. |
+| `!multiline`                      | `true`, `false` | `false` | When `true`, enables multiline mode: `@line-start` matches the start of each line and `@line-end` matches the end of each line rather than the start/end of the whole string. Using `@line-start` or `@line-end` anywhere in a pattern also enables this automatically. |
+| `!replacements-preserve-matching` | `true`, `false` | `false` | When `true`, each value supplied to a `replace*` call is validated against the capture's own subpattern before substitution. Throws `ReplacementError` if the value would not match. |
 
 
 ## Ptern Language Structure
@@ -85,6 +91,7 @@ ExcludingKeyword      =  'excluding' ;
 TrueKeyword           =  'true' ;
 FalseKeyword          =  'false' ;
 Bang                  =  '!' ;
+PositionAssertion     =  '@' %Alpha (%Alnum | '-') * 0..63 ;
 AtSign                =  '@' ;
 QuestionMark          =  '?' ;
 Identifier            =  %Alpha (%Alnum | '-') * 0..63 ;
@@ -93,6 +100,7 @@ Whitespace
 | Comment
 | AsKeyword
 | Bang
+| PositionAssertion
 | AtSign
 | ExcludingKeyword
 | QuestionMark

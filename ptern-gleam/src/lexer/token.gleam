@@ -73,7 +73,11 @@ pub type Token {
   /// `!` — introduces an annotation, e.g. `!case-insensitive = true`.
   Bang
 
-  /// `@` — reserved for future use (zero-width position assertions).
+  /// `@word-start`, `@word-end`, `@line-start`, `@line-end` — a zero-width
+  /// position assertion. `name` is the identifier after the `@` sigil.
+  PositionAssertion(name: String)
+
+  /// `@` — a bare at-sign with no following identifier (reserved).
   At
 
   /// `?` — used as the upper bound of an unbounded repetition, e.g. `* 1..?`.

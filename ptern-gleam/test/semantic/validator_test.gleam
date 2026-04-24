@@ -190,3 +190,47 @@ pub fn nested_capture_inside_repetition_test() {
   let errs = validate("(('a' as inner) * 2) * 3")
   errs |> has_error(CaptureInRepetition("inner")) |> should.be_true
 }
+
+// ---------------------------------------------------------------------------
+// Position assertions
+// ---------------------------------------------------------------------------
+
+pub fn valid_word_start_test() {
+  validate("@word-start %Alpha * 1..?")
+  |> should.equal([])
+}
+
+pub fn valid_word_end_test() {
+  validate("%Alpha * 1..? @word-end")
+  |> should.equal([])
+}
+
+pub fn valid_line_start_test() {
+  validate("@line-start %Digit * 1..?")
+  |> should.equal([])
+}
+
+pub fn valid_line_end_test() {
+  validate("%Digit * 1..? @line-end")
+  |> should.equal([])
+}
+
+pub fn unknown_position_assertion_test() {
+  let errs = validate("@start-of-line 'x'")
+  errs |> has_error(error.UnknownPositionAssertion("start-of-line")) |> should.be_true
+}
+
+pub fn position_assertion_in_repetition_test() {
+  let errs = validate("@word-start * 3")
+  errs |> has_error(error.PositionAssertionInRepetition("word-start")) |> should.be_true
+}
+
+pub fn position_assertion_exact_repetition_test() {
+  let errs = validate("@line-end * 1")
+  errs |> has_error(error.PositionAssertionInRepetition("line-end")) |> should.be_true
+}
+
+pub fn multiline_annotation_valid_test() {
+  validate("!multiline = true\n'x'")
+  |> should.equal([])
+}

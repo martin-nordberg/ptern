@@ -346,3 +346,45 @@ pub fn lex_excluding_expression_test() {
     ]),
   )
 }
+
+// ---------------------------------------------------------------------------
+// Position assertions
+// ---------------------------------------------------------------------------
+
+pub fn lex_position_assertion_word_start_test() {
+  lexer.lex("@word-start")
+  |> should.equal(Ok([token.PositionAssertion("word-start")]))
+}
+
+pub fn lex_position_assertion_word_end_test() {
+  lexer.lex("@word-end")
+  |> should.equal(Ok([token.PositionAssertion("word-end")]))
+}
+
+pub fn lex_position_assertion_line_start_test() {
+  lexer.lex("@line-start")
+  |> should.equal(Ok([token.PositionAssertion("line-start")]))
+}
+
+pub fn lex_position_assertion_line_end_test() {
+  lexer.lex("@line-end")
+  |> should.equal(Ok([token.PositionAssertion("line-end")]))
+}
+
+pub fn lex_bare_at_sign_still_produces_at_test() {
+  lexer.lex("@")
+  |> should.equal(Ok([At]))
+}
+
+pub fn lex_position_assertion_in_sequence_test() {
+  lexer.lex("@word-start %Alpha @word-end")
+  |> should.equal(
+    Ok([
+      token.PositionAssertion("word-start"),
+      Whitespace,
+      CharacterClass("Alpha"),
+      Whitespace,
+      token.PositionAssertion("word-end"),
+    ]),
+  )
+}

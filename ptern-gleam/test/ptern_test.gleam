@@ -736,3 +736,72 @@ pub fn capture_definition_conflict_named_test() {
   |> has_semantic_error(error.CaptureDefinitionConflict("year"))
   |> should.be_true
 }
+
+// ---------------------------------------------------------------------------
+// Position assertions
+// ---------------------------------------------------------------------------
+
+pub fn word_boundary_matches_whole_word_test() {
+  let assert Ok(p) = ptern.compile("@word-start %Alpha * 1..? @word-end")
+  ptern.matches_all_of(p, "hello") |> should.be_true
+  ptern.matches_in(p, "say hello there") |> should.be_true
+  ptern.matches_in(p, "123") |> should.be_false
+}
+
+pub fn word_start_does_not_match_mid_word_test() {
+  let assert Ok(p) = ptern.compile("@word-start 'un'")
+  ptern.matches_in(p, "undo") |> should.be_true
+  ptern.matches_in(p, "fun") |> should.be_false
+}
+
+pub fn word_end_does_not_match_mid_word_test() {
+  let assert Ok(p) = ptern.compile("'ing' @word-end")
+  ptern.matches_in(p, "running") |> should.be_true
+  ptern.matches_in(p, "rings") |> should.be_false
+}
+
+pub fn line_start_matches_at_line_beginning_test() {
+  let assert Ok(p) = ptern.compile("@line-start %Digit * 1..?")
+  ptern.matches_in(p, "42 items") |> should.be_true
+  ptern.match_all_in(p, "1 first\n2 second\n3 third")
+  |> list.length
+  |> should.equal(3)
+}
+
+pub fn line_end_matches_at_line_end_test() {
+  let assert Ok(p) = ptern.compile("%Alpha * 1..? @line-end")
+  ptern.match_all_in(p, "hello\nworld\n123")
+  |> list.length
+  |> should.equal(2)
+}
+
+pub fn line_start_and_end_matches_full_line_test() {
+  let assert Ok(p) = ptern.compile("@line-start %Alpha * 1..? @line-end")
+  ptern.match_all_in(p, "hello\nworld\n123")
+  |> list.length
+  |> should.equal(2)
+}
+
+pub fn multiline_annotation_alone_enables_m_flag_test() {
+  let assert Ok(p) = ptern.compile("!multiline = true\n%Alpha * 1..?")
+  ptern.min_length(p) |> should.equal(1)
+  ptern.max_length(p) |> should.equal(option.None)
+}
+
+pub fn position_assertion_length_is_zero_test() {
+  let assert Ok(p) = ptern.compile("@word-start %Digit * 4 @word-end")
+  ptern.min_length(p) |> should.equal(4)
+  ptern.max_length(p) |> should.equal(option.Some(4))
+}
+
+pub fn unknown_position_assertion_error_test() {
+  ptern.compile("@bogus 'x'")
+  |> has_semantic_error(error.UnknownPositionAssertion("bogus"))
+  |> should.be_true
+}
+
+pub fn position_assertion_in_repetition_error_test() {
+  ptern.compile("@word-start * 3")
+  |> has_semantic_error(error.PositionAssertionInRepetition("word-start"))
+  |> should.be_true
+}

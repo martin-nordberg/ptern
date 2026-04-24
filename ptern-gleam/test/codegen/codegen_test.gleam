@@ -302,3 +302,51 @@ pub fn zip_code_test() {
   source("%Digit * 5 ('-' %Digit * 4) * 0..1")
   |> should.equal("[0-9]{5}(?:-[0-9]{4})?")
 }
+
+// ---------------------------------------------------------------------------
+// Position assertions
+// ---------------------------------------------------------------------------
+
+pub fn word_start_compiles_to_word_boundary_test() {
+  source("@word-start %Alpha * 1..?") |> should.equal("\\b[A-Za-z]+")
+}
+
+pub fn word_end_compiles_to_word_boundary_test() {
+  source("%Alpha * 1..? @word-end") |> should.equal("[A-Za-z]+\\b")
+}
+
+pub fn word_boundaries_around_word_test() {
+  source("@word-start %Alpha * 1..? @word-end") |> should.equal("\\b[A-Za-z]+\\b")
+}
+
+pub fn line_start_compiles_to_caret_test() {
+  source("@line-start %Digit * 1..?") |> should.equal("^[0-9]+")
+}
+
+pub fn line_end_compiles_to_dollar_test() {
+  source("%Digit * 1..? @line-end") |> should.equal("[0-9]+$")
+}
+
+pub fn multiline_annotation_adds_m_flag_test() {
+  flags("!multiline = true\n'x'") |> should.equal("vm")
+}
+
+pub fn multiline_with_case_insensitive_test() {
+  flags("!multiline = true\n!case-insensitive = true\n'x'") |> should.equal("vim")
+}
+
+pub fn line_start_auto_enables_multiline_flag_test() {
+  flags("@line-start %Alpha * 1..?") |> should.equal("vm")
+}
+
+pub fn line_end_auto_enables_multiline_flag_test() {
+  flags("%Alpha * 1..? @line-end") |> should.equal("vm")
+}
+
+pub fn word_boundary_does_not_add_multiline_flag_test() {
+  flags("@word-start %Alpha * 1..? @word-end") |> should.equal("v")
+}
+
+pub fn line_boundary_in_definition_auto_enables_multiline_test() {
+  flags("row = @line-start %Alpha * 1..? @line-end; {row}") |> should.equal("vm")
+}
