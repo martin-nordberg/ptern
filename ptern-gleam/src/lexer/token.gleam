@@ -77,9 +77,6 @@ pub type Token {
   /// position assertion. `name` is the identifier after the `@` sigil.
   PositionAssertion(name: String)
 
-  /// `@` — a bare at-sign with no following identifier (reserved).
-  At
-
   /// `?` — used as the upper bound of an unbounded repetition, e.g. `* 1..?`.
   QuestionMark
 

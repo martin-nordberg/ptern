@@ -1,7 +1,7 @@
 import gleeunit/should
 import lexer/lexer
 import lexer/token.{
-  As, At, Asterisk, Bang, CharacterClass, Comment, DoubleQuotedLiteral, Equals,
+  As, Asterisk, Bang, CharacterClass, Comment, DoubleQuotedLiteral, Equals,
   Excluding, FalseKeyword, Identifier, Integer, LeftBrace, LeftParen,
   AlternativeOperator, QuestionMark, RangeOperator, RightBrace, RightParen,
   Semicolon, SingleQuotedLiteral, TrueKeyword, Whitespace,
@@ -303,11 +303,6 @@ pub fn lex_bang_test() {
   |> should.equal(Ok([Bang]))
 }
 
-pub fn lex_at_sign_test() {
-  lexer.lex("@")
-  |> should.equal(Ok([At]))
-}
-
 pub fn lex_true_keyword_test() {
   lexer.lex("true")
   |> should.equal(Ok([TrueKeyword]))
@@ -371,9 +366,9 @@ pub fn lex_position_assertion_line_end_test() {
   |> should.equal(Ok([token.PositionAssertion("line-end")]))
 }
 
-pub fn lex_bare_at_sign_still_produces_at_test() {
+pub fn lex_bare_at_sign_is_error_test() {
   lexer.lex("@")
-  |> should.equal(Ok([At]))
+  |> should.be_error
 }
 
 pub fn lex_position_assertion_in_sequence_test() {

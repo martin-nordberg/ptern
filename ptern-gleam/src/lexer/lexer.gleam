@@ -3,7 +3,7 @@ import gleam/list
 import gleam/result
 import gleam/string
 import lexer/token.{
-  type LexError, type Token, As, At, Asterisk, Bang, CharacterClass, Comment,
+  type LexError, type Token, As, Asterisk, Bang, CharacterClass, Comment,
   DoubleQuotedLiteral, Equals, Excluding, FalseKeyword, Identifier, Integer,
   LeftBrace, LeftParen, AlternativeOperator, PositionAssertion, QuestionMark,
   RangeOperator, RightBrace, RightParen, Semicolon, SingleQuotedLiteral,
@@ -217,17 +217,17 @@ fn lex_character_class_rest(
 }
 
 // Called after the `@` sigil has been consumed.
-// Reads the following identifier (letters, digits, hyphens) and produces a
-// PositionAssertion token. A bare `@` with no identifier falls back to At.
+// The first character must be an ASCII letter (the start of the assertion name).
+// A bare `@` with no following letter is a lex error.
 fn lex_position_assertion(
   input: String,
   acc: List(Token),
 ) -> Result(List(Token), LexError) {
   case string.pop_grapheme(input) {
-    Error(_) -> do_lex(input, [At, ..acc])
+    Error(_) -> Error(UnexpectedCharacter("@"))
     Ok(#(char, rest)) ->
       case is_alpha(char) {
-        False -> do_lex(input, [At, ..acc])
+        False -> Error(UnexpectedCharacter("@"))
         True -> lex_position_assertion_rest(rest, char, acc)
       }
   }

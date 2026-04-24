@@ -124,7 +124,7 @@ pub fn token_display(token: Token) -> String {
     token.FalseKeyword -> "false"
     token.PositionAssertion(name) -> "@" <> name
     token.Bang -> "!"
-    token.At -> "@"
+
     token.QuestionMark -> "?"
     token.Identifier(n) -> n
     token.Whitespace -> "<whitespace>"

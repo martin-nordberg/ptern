@@ -92,7 +92,6 @@ TrueKeyword           =  'true' ;
 FalseKeyword          =  'false' ;
 Bang                  =  '!' ;
 PositionAssertion     =  '@' %Alpha (%Alnum | '-') * 0..63 ;
-AtSign                =  '@' ;
 QuestionMark          =  '?' ;
 Identifier            =  %Alpha (%Alnum | '-') * 0..63 ;
 
@@ -101,7 +100,6 @@ Whitespace
 | AsKeyword
 | Bang
 | PositionAssertion
-| AtSign
 | ExcludingKeyword
 | QuestionMark
 | FalseKeyword
