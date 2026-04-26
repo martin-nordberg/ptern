@@ -31,13 +31,22 @@ interface GleamOption {
 }
 
 interface GleamCompiledPattern {
+  // Fields from the Ptern opaque record (Gleam field names match JS property names)
+  min_len: number;
+  max_len: GleamOption;
+  ignore_matching: boolean;
+  is_substitutable: boolean;
+  ignore_substitution_matching: boolean;
+  substitution_plan: GleamOption; // Gleam Option(SubstitutionPlan)
+  // Extra fields added for TypeScript interop
   source: string;
   flags: string;
-  min_length: number;
-  max_length: GleamOption;
-  ignore_matching: boolean;
-  capture_validators: unknown; // Gleam List(#(String, String))
+  capture_validator_list: unknown; // Gleam List(#(String, String))
 }
+
+// Gleam SubstitutionPlan ADT nodes as emitted by the compiler.
+// Each variant is a JS class with named fields matching the Gleam field names.
+type GleamPlan = Record<string, unknown> & { constructor: { name: string } };
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -100,6 +109,12 @@ export interface Ptern {
    * pattern is unbounded (e.g. uses `*` or `+` repetition).
    */
   maxLength(): number | null;
+  /**
+   * Assemble a string from named capture values.
+   * Requires `!substitutable = true` to be declared in the ptern source.
+   * Throws `SubstitutionError` on failure.
+   */
+  substitute(captures: Record<string, string | string[]>): string;
 }
 
 export type CompileError =
@@ -112,6 +127,14 @@ export type ReplacementError = {
   captureName: string;
   value: string;
 };
+
+export type SubstitutionError =
+  | { kind: "NotSubstitutable" }
+  | { kind: "MissingCapture"; captureName: string }
+  | { kind: "CaptureMismatch"; captureName: string; value: string }
+  | { kind: "WrongCaptureType"; captureName: string }
+  | { kind: "ArrayLengthError"; captureName: string; length: number; min: number; max: number | null }
+  | { kind: "NoMatchingBranch" };
 
 // ---------------------------------------------------------------------------
 // Internal implementation
@@ -127,6 +150,9 @@ class PternImpl implements Ptern {
   private readonly _max: number | null;
   private readonly _ignoreMatching: boolean;
   private readonly _captureValidators: Map<string, RegExp>;
+  private readonly _isSubstitutable: boolean;
+  private readonly _ignoreSubstitutionMatching: boolean;
+  private readonly _substitutionPlan: GleamPlan | null;
 
   constructor(
     source: string,
@@ -135,6 +161,9 @@ class PternImpl implements Ptern {
     maxLen: number | null,
     ignoreMatching: boolean,
     captureValidators: Map<string, RegExp>,
+    isSubstitutable: boolean,
+    ignoreSubstitutionMatching: boolean,
+    substitutionPlan: GleamPlan | null,
   ) {
     const df = flags.includes("d") ? flags : flags + "d";
     this._full = new RegExp(`^(?:${source})$`, df);
@@ -146,6 +175,9 @@ class PternImpl implements Ptern {
     this._max = maxLen;
     this._ignoreMatching = ignoreMatching;
     this._captureValidators = captureValidators;
+    this._isSubstitutable = isSubstitutable;
+    this._ignoreSubstitutionMatching = ignoreSubstitutionMatching;
+    this._substitutionPlan = substitutionPlan;
   }
 
   private validateReplacements(replacements: MatchResult): void {
@@ -320,6 +352,20 @@ class PternImpl implements Ptern {
   maxLength(): number | null {
     return this._max;
   }
+
+  substitute(captures: Record<string, string | string[]>): string {
+    if (!this._isSubstitutable || this._substitutionPlan === null) {
+      throw { kind: "NotSubstitutable" } satisfies SubstitutionError;
+    }
+    const cursors = new Map<string, number>();
+    return evaluatePlan(
+      this._substitutionPlan,
+      captures,
+      this._captureValidators,
+      this._ignoreSubstitutionMatching,
+      cursors,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -361,35 +407,41 @@ export function compile(source: string): Ptern {
         const ev = e as { [k: string]: unknown };
         switch (eName) {
           case "UndefinedReference":
-            return `Undefined reference: ${ev[0]}`;
+            return `Undefined reference: ${ev["name"]}`;
           case "DuplicateDefinition":
-            return `Duplicate definition: ${ev[0]}`;
+            return `Duplicate definition: ${ev["name"]}`;
           case "CircularDefinition":
-            return `Circular definition: ${gleamListToArray(ev[0]).join(", ")}`;
+            return `Circular definition: ${gleamListToArray(ev["names"]).join(", ")}`;
           case "DuplicateCapture":
-            return `Duplicate capture: ${ev[0]}`;
+            return `Duplicate capture: ${ev["name"]}`;
           case "CaptureDefinitionConflict":
-            return `Capture/definition conflict: ${ev[0]}`;
+            return `Capture/definition conflict: ${ev["name"]}`;
           case "CaptureInRepetition":
-            return `Named capture inside repetition: ${ev[0]}`;
+            return `Named capture inside repetition: ${ev["name"]}`;
           case "InvalidRangeEndpoint":
-            return `Invalid range endpoint: ${ev[0]}`;
+            return `Invalid range endpoint: ${ev["content"]}`;
           case "InvertedRange":
-            return `Inverted range: ${ev.from}..${ev.to}`;
+            return `Inverted range: ${ev["from"]}..${ev["to"]}`;
           case "InvertedRepetitionBounds":
-            return `Inverted repetition bounds: ${ev.min}..${ev.max}`;
+            return `Inverted repetition bounds: ${ev["min"]}..${ev["max"]}`;
           case "InvalidExclusionOperand":
             return "Invalid exclusion operand";
           case "UnknownAnnotation":
-            return `Unknown annotation: ${ev[0]}`;
+            return `Unknown annotation: ${ev["name"]}`;
           case "DuplicateAnnotation":
-            return `Duplicate annotation: ${ev[0]}`;
+            return `Duplicate annotation: ${ev["name"]}`;
           case "InvalidEscapeSequence":
-            return `Invalid escape sequence: ${ev[0]}`;
+            return `Invalid escape sequence: ${ev["seq"]}`;
           case "UnknownPositionAssertion":
-            return `Unknown position assertion: ${ev[0]}`;
+            return `Unknown position assertion: ${ev["name"]}`;
           case "PositionAssertionInRepetition":
-            return `Position assertion inside repetition: ${ev[0]}`;
+            return `Position assertion inside repetition: ${ev["name"]}`;
+          case "SubstitutionsIgnoreMatchingWithoutSubstitutable":
+            return "!substitutions-ignore-matching requires !substitutable = true";
+          case "NotSubstitutableBody":
+            return "Pattern body is not substitutable (set !substitutable = true only on fully substitutable patterns)";
+          case "BoundedRepetitionNeedsCapture":
+            return "Bounded repetition in substitutable pattern must contain at least one named capture";
           default:
             return eName;
         }
@@ -398,16 +450,34 @@ export function compile(source: string): Ptern {
   }
 
   const cp = result[0] as GleamCompiledPattern;
-  const maxLen =
-    cp.max_length[0] !== undefined ? (cp.max_length[0] as number) : null;
+  const maxLen = cp.max_len[0] !== undefined ? (cp.max_len[0] as number) : null;
 
-  const cvEntries = gleamListToArray(cp.capture_validators) as Array<[string, string]>;
-  const df = cp.flags.includes("d") ? cp.flags : cp.flags + "d";
-  const captureValidators = new Map<string, RegExp>(
-    cvEntries.map(([name, fragment]) => [name, new RegExp(`^(?:${fragment})$`, df)]),
+  const cvEntries = gleamListToArray(cp.capture_validator_list) as Array<[string, string]>;
+  // Keep the first fragment for each name (subsequent ones are back-reference
+  // captures whose compiled body is (?:(?!)) and would break validation).
+  const captureValidators = new Map<string, RegExp>();
+  for (const [name, fragment] of cvEntries) {
+    if (!captureValidators.has(name)) {
+      captureValidators.set(name, new RegExp(`^(?:${fragment})$`, cp.flags));
+    }
+  }
+
+  const substitutionPlan =
+    cp.substitution_plan[0] !== undefined
+      ? (cp.substitution_plan[0] as GleamPlan)
+      : null;
+
+  return new PternImpl(
+    cp.source,
+    cp.flags,
+    cp.min_len,
+    maxLen,
+    cp.ignore_matching,
+    captureValidators,
+    cp.is_substitutable,
+    cp.ignore_substitution_matching,
+    substitutionPlan,
   );
-
-  return new PternImpl(cp.source, cp.flags, cp.min_length, maxLen, cp.ignore_matching, captureValidators);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,4 +509,193 @@ function gleamListToArray(list: unknown): unknown[] {
     node = node.tail as typeof node;
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Substitution plan evaluation
+// ---------------------------------------------------------------------------
+
+// Collect all PlanCapture names directly within a plan subtree, treating
+// each PlanCapture as a leaf (not recursing into its inner).
+function collectDirectCaptureNames(plan: GleamPlan): string[] {
+  switch (plan.constructor.name) {
+    case "PlanCapture":
+      return [plan["name"] as string];
+    case "PlanSequence":
+      return gleamListToArray(plan["items"]).flatMap(
+        (p) => collectDirectCaptureNames(p as GleamPlan),
+      );
+    case "PlanAlternation": {
+      const all = gleamListToArray(plan["branches"]).flatMap(
+        (p) => collectDirectCaptureNames(p as GleamPlan),
+      );
+      return [...new Set(all)];
+    }
+    case "PlanFixedRep":
+    case "PlanBoundedRep":
+      return collectDirectCaptureNames(plan["inner"] as GleamPlan);
+    default:
+      return [];
+  }
+}
+
+function evaluatePlan(
+  plan: GleamPlan,
+  captures: Record<string, string | string[]>,
+  validators: Map<string, RegExp>,
+  ignoreMatching: boolean,
+  cursors: Map<string, number>,
+): string {
+  switch (plan.constructor.name) {
+    case "PlanLiteral":
+      return plan["text"] as string;
+
+    case "PlanPositionAssertion":
+      return "";
+
+    case "PlanNotEvaluable":
+      // Reached only when a named capture above this was absent. Callers
+      // must throw MissingCapture before reaching here; this is a safety net.
+      throw { kind: "NoMatchingBranch" } satisfies SubstitutionError;
+
+    case "PlanCapture": {
+      const name = plan["name"] as string;
+      const inner = plan["inner"] as GleamPlan;
+      if (name in captures) {
+        const val = captures[name];
+        if (Array.isArray(val)) {
+          const cursor = cursors.get(name) ?? 0;
+          if (cursor >= val.length) {
+            throw { kind: "MissingCapture", captureName: name } satisfies SubstitutionError;
+          }
+          const elem = val[cursor]!;
+          if (!ignoreMatching) {
+            const re = validators.get(name);
+            if (re !== undefined && !re.test(elem)) {
+              throw { kind: "CaptureMismatch", captureName: name, value: elem } satisfies SubstitutionError;
+            }
+          }
+          cursors.set(name, cursor + 1);
+          return elem;
+        }
+        // scalar string
+        if (typeof val !== "string") {
+          throw { kind: "WrongCaptureType", captureName: name } satisfies SubstitutionError;
+        }
+        if (!ignoreMatching) {
+          const re = validators.get(name);
+          if (re !== undefined && !re.test(val)) {
+            throw { kind: "CaptureMismatch", captureName: name, value: val } satisfies SubstitutionError;
+          }
+        }
+        return val;
+      }
+      // Absent: evaluate inner. NoMatchingBranch from a non-substitutable
+      // inner expression means the capture was required — convert to MissingCapture.
+      try {
+        return evaluatePlan(inner, captures, validators, ignoreMatching, cursors);
+      } catch (e) {
+        const err = e as SubstitutionError;
+        if (err.kind === "NoMatchingBranch") {
+          throw { kind: "MissingCapture", captureName: name } satisfies SubstitutionError;
+        }
+        throw e;
+      }
+    }
+
+    case "PlanSequence": {
+      const items = gleamListToArray(plan["items"]) as GleamPlan[];
+      return items
+        .map((item) => evaluatePlan(item, captures, validators, ignoreMatching, cursors))
+        .join("");
+    }
+
+    case "PlanAlternation": {
+      const branches = gleamListToArray(plan["branches"]) as GleamPlan[];
+      for (const branch of branches) {
+        const savedCursors = new Map(cursors);
+        try {
+          return evaluatePlan(branch, captures, validators, ignoreMatching, cursors);
+        } catch (e) {
+          const err = e as SubstitutionError;
+          if (err.kind === "MissingCapture" || err.kind === "NoMatchingBranch") {
+            // Restore cursors and try next branch.
+            cursors.clear();
+            for (const [k, v] of savedCursors) cursors.set(k, v);
+            continue;
+          }
+          throw e;
+        }
+      }
+      throw { kind: "NoMatchingBranch" } satisfies SubstitutionError;
+    }
+
+    case "PlanFixedRep": {
+      const inner = plan["inner"] as GleamPlan;
+      const count = plan["count"] as number;
+      let out = "";
+      for (let i = 0; i < count; i++) {
+        out += evaluatePlan(inner, captures, validators, ignoreMatching, cursors);
+      }
+      return out;
+    }
+
+    case "PlanBoundedRep": {
+      const inner = plan["inner"] as GleamPlan;
+      const minVal = plan["min"] as number;
+      const maxOpt = plan["max"] as GleamOption;
+      const maxVal = maxOpt[0] !== undefined ? (maxOpt[0] as number) : null;
+
+      const captureNames = collectDirectCaptureNames(inner);
+
+      // Determine iteration count from array-valued captures.
+      let iterCount: number | null = null;
+      let firstArrayName: string | null = null;
+      for (const name of captureNames) {
+        const val = captures[name];
+        if (Array.isArray(val)) {
+          const cursor = cursors.get(name) ?? 0;
+          const remaining = val.length - cursor;
+          if (iterCount === null) {
+            iterCount = remaining;
+            firstArrayName = name;
+          } else if (iterCount !== remaining) {
+            throw {
+              kind: "ArrayLengthError",
+              captureName: name,
+              length: val.length,
+              min: minVal,
+              max: maxVal,
+            } satisfies SubstitutionError;
+          }
+        }
+      }
+
+      // No array captures: produce empty string when min=0 and all captures
+      // are absent; otherwise error.
+      if (iterCount === null) {
+        if (minVal === 0) return "";
+        throw { kind: "NoMatchingBranch" } satisfies SubstitutionError;
+      }
+
+      if (iterCount < minVal || (maxVal !== null && iterCount > maxVal)) {
+        throw {
+          kind: "ArrayLengthError",
+          captureName: firstArrayName!,
+          length: (captures[firstArrayName!] as string[]).length,
+          min: minVal,
+          max: maxVal,
+        } satisfies SubstitutionError;
+      }
+
+      let out = "";
+      for (let i = 0; i < iterCount; i++) {
+        out += evaluatePlan(inner, captures, validators, ignoreMatching, cursors);
+      }
+      return out;
+    }
+
+    default:
+      return "";
+  }
 }

@@ -2,9 +2,10 @@ import gleeunit/should
 import lexer/lexer
 import parser/parser
 import semantic/error.{
-  CaptureInRepetition, DuplicateAnnotation, InvalidEscapeSequence,
-  InvalidExclusionOperand, InvalidRangeEndpoint, InvertedRange,
-  InvertedRepetitionBounds, UnknownAnnotation,
+  BoundedRepetitionNeedsCapture, CaptureInRepetition, DuplicateAnnotation,
+  InvalidEscapeSequence, InvalidExclusionOperand, InvalidRangeEndpoint,
+  InvertedRange, InvertedRepetitionBounds, NotSubstitutableBody,
+  SubstitutionsIgnoreMatchingWithoutSubstitutable, UnknownAnnotation,
 }
 import semantic/validator
 
@@ -233,4 +234,120 @@ pub fn position_assertion_exact_repetition_test() {
 pub fn multiline_annotation_valid_test() {
   validate("!multiline = true\n'x'")
   |> should.equal([])
+}
+
+// ---------------------------------------------------------------------------
+// !substitutable
+// ---------------------------------------------------------------------------
+
+pub fn substitutable_literal_valid_test() {
+  validate("!substitutable = true\n'hello'")
+  |> should.equal([])
+}
+
+pub fn substitutable_named_capture_of_class_valid_test() {
+  validate("!substitutable = true\n%Digit * 4 as year")
+  |> should.equal([])
+}
+
+pub fn substitutable_bare_charclass_invalid_test() {
+  let errs = validate("!substitutable = true\n%Digit")
+  errs |> has_error(NotSubstitutableBody) |> should.be_true
+}
+
+pub fn substitutable_bare_charrange_invalid_test() {
+  let errs = validate("!substitutable = true\n'a'..'z'")
+  errs |> has_error(NotSubstitutableBody) |> should.be_true
+}
+
+pub fn substitutable_group_of_literal_valid_test() {
+  validate("!substitutable = true\n('hello')")
+  |> should.equal([])
+}
+
+pub fn substitutable_alternation_all_literal_valid_test() {
+  validate("!substitutable = true\n'foo' | 'bar'")
+  |> should.equal([])
+}
+
+pub fn substitutable_alternation_mixed_invalid_test() {
+  let errs = validate("!substitutable = true\n'foo' | %Digit")
+  errs |> has_error(NotSubstitutableBody) |> should.be_true
+}
+
+pub fn substitutable_sequence_all_literal_valid_test() {
+  validate("!substitutable = true\n'hello' ' ' 'world'")
+  |> should.equal([])
+}
+
+pub fn substitutable_sequence_mixed_invalid_test() {
+  let errs = validate("!substitutable = true\n'hello' %Digit")
+  errs |> has_error(NotSubstitutableBody) |> should.be_true
+}
+
+pub fn substitutable_fixed_rep_of_literal_valid_test() {
+  validate("!substitutable = true\n'x' * 3")
+  |> should.equal([])
+}
+
+pub fn substitutable_bounded_rep_with_capture_valid_test() {
+  validate("!substitutable = true\n%Digit * 1..4 as d")
+  |> should.equal([])
+}
+
+pub fn substitutable_bounded_rep_no_capture_invalid_test() {
+  let errs = validate("!substitutable = true\n%Digit * 1..4")
+  errs |> has_error(BoundedRepetitionNeedsCapture) |> should.be_true
+}
+
+pub fn substitutable_bounded_rep_in_group_with_capture_valid_test() {
+  validate("!substitutable = true\n(',' %Digit * 1..4 as d) * 0..10")
+  |> should.equal([])
+}
+
+pub fn substitutable_capture_in_repetition_allowed_test() {
+  validate("!substitutable = true\n%Digit * 4 as n")
+  |> should.equal([])
+}
+
+pub fn substitutable_interpolation_of_literal_def_valid_test() {
+  validate("!substitutable = true\nword = 'hello';\n{word}")
+  |> should.equal([])
+}
+
+pub fn substitutable_interpolation_of_class_def_invalid_test() {
+  let errs = validate("!substitutable = true\ndigits = %Digit * 4;\n{digits}")
+  errs |> has_error(NotSubstitutableBody) |> should.be_true
+}
+
+pub fn substitutable_interpolation_with_outer_capture_valid_test() {
+  validate("!substitutable = true\ndigits = %Digit * 4;\n{digits} as year")
+  |> should.equal([])
+}
+
+// ---------------------------------------------------------------------------
+// !substitutions-ignore-matching
+// ---------------------------------------------------------------------------
+
+pub fn substitutions_ignore_matching_requires_substitutable_test() {
+  let errs = validate("!substitutions-ignore-matching = true\n'hello'")
+  errs
+  |> has_error(SubstitutionsIgnoreMatchingWithoutSubstitutable)
+  |> should.be_true
+}
+
+pub fn substitutions_ignore_matching_with_substitutable_valid_test() {
+  validate("!substitutable = true\n!substitutions-ignore-matching = true\n'hello'")
+  |> should.equal([])
+}
+
+pub fn substitutions_ignore_matching_false_without_substitutable_valid_test() {
+  validate("!substitutions-ignore-matching = false\n'hello'")
+  |> should.equal([])
+}
+
+// CaptureInRepetition is still enforced when !substitutable is false/absent.
+pub fn capture_in_repetition_still_errors_without_substitutable_test() {
+  let errs = validate("(%Digit as d) * 3")
+  errs |> has_error(CaptureInRepetition("d")) |> should.be_true
 }

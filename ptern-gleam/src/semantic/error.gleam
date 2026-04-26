@@ -51,4 +51,16 @@ pub type SemanticError {
 
   /// A position assertion (`@word-start` etc.) has a repetition count applied.
   PositionAssertionInRepetition(name: String)
+
+  /// `!substitutions-ignore-matching = true` is set but `!substitutable = true`
+  /// is absent or false — the annotation is meaningless without substitution.
+  SubstitutionsIgnoreMatchingWithoutSubstitutable
+
+  /// `!substitutable = true` is set but the final body expression (or a
+  /// sub-expression outside any named capture) is not substitutable.
+  NotSubstitutableBody
+
+  /// A bounded repetition `E * n..m` inside a substitutable context contains
+  /// no named capture, so the iteration count cannot be determined at runtime.
+  BoundedRepetitionNeedsCapture
 }

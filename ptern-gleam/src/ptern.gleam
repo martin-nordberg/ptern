@@ -14,7 +14,7 @@ import parser/ast.{
 }
 import parser/parser
 import regex
-import semantic/error.{type SemanticError}
+import semantic/error as semantic_error
 import semantic/resolver
 import semantic/validator
 
@@ -25,7 +25,7 @@ import semantic/validator
 pub type CompileError {
   LexError(token.LexError)
   ParseError(ast.ParseError)
-  SemanticErrors(List(SemanticError))
+  SemanticErrors(List(semantic_error.SemanticError))
 }
 
 pub type MatchOccurrence {
@@ -34,6 +34,15 @@ pub type MatchOccurrence {
 
 pub type ReplacementError {
   InvalidReplacementValue(capture_name: String, value: String)
+}
+
+pub type SubstitutionError {
+  NotSubstitutable
+  MissingCapture(name: String)
+  CaptureMismatch(name: String, value: String)
+  WrongCaptureType(name: String)
+  ArrayLengthError(name: String, length: Int, min: Int, max: Option(Int))
+  NoMatchingBranch
 }
 
 pub opaque type Ptern {
@@ -47,6 +56,13 @@ pub opaque type Ptern {
     max_len: Option(Int),
     ignore_matching: Bool,
     capture_validators: dict.Dict(String, regex.Regex),
+    is_substitutable: Bool,
+    ignore_substitution_matching: Bool,
+    substitution_plan: Option(codegen.SubstitutionPlan),
+    // Fields read by the TypeScript wrapper (index.ts)
+    source: String,
+    flags: String,
+    capture_validator_list: List(#(String, String)),
   )
 }
 
@@ -57,8 +73,23 @@ pub opaque type Ptern {
 pub fn compile(source: String) -> Result(Ptern, CompileError) {
   use tokens <- result.try(lexer.lex(source) |> result.map_error(LexError))
   use parsed <- result.try(parser.parse(tokens) |> result.map_error(ParseError))
-  let semantic_errors =
+  let is_substitutable =
+    list.any(parsed.annotations, fn(a) { a.name == "substitutable" && a.value })
+  let all_errors =
     list.append(validator.validate(parsed), resolver.resolve(parsed))
+  // When !substitutable = true, duplicate captures are intentional (the same
+  // name in multiple positions supplies the same value, or an array value
+  // consumed sequentially). Filter them out only in that case.
+  let semantic_errors = case is_substitutable {
+    False -> all_errors
+    True ->
+      list.filter(all_errors, fn(e) {
+        case e {
+          semantic_error.DuplicateCapture(_) -> False
+          _ -> True
+        }
+      })
+  }
   case semantic_errors {
     [_, ..] -> Error(SemanticErrors(semantic_errors))
     [] -> {
@@ -87,6 +118,12 @@ pub fn compile(source: String) -> Result(Ptern, CompileError) {
           compiled.capture_validators,
           d_flg,
         ),
+        is_substitutable: compiled.is_substitutable,
+        ignore_substitution_matching: compiled.ignore_substitution_matching,
+        substitution_plan: compiled.substitution_plan,
+        source: src,
+        flags: d_flg,
+        capture_validator_list: compiled.capture_validators,
       ))
     }
   }
@@ -167,9 +204,14 @@ fn build_capture_validators(
   fragments: List(#(String, String)),
   flags: String,
 ) -> dict.Dict(String, regex.Regex) {
+  // Keep only the first fragment for each name: subsequent occurrences of the
+  // same capture name are back-references whose compiled body is (?:(?!)).
   list.fold(fragments, dict.new(), fn(acc, pair) {
     let #(name, fragment) = pair
-    dict.insert(acc, name, regex.make("^(?:" <> fragment <> ")$", flags))
+    case dict.has_key(acc, name) {
+      True -> acc
+      False -> dict.insert(acc, name, regex.make("^(?:" <> fragment <> ")$", flags))
+    }
   })
 }
 

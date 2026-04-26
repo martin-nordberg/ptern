@@ -3,7 +3,7 @@
 // applicable captures and boundary cases.
 
 import gleam/dict
-import gleam/option.{None, Some}
+import gleam/option.{Some}
 import gleeunit/should
 import ptern
 
