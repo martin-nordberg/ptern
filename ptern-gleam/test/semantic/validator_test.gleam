@@ -2,7 +2,7 @@ import gleeunit/should
 import lexer/lexer
 import parser/parser
 import semantic/error.{
-  BoundedRepetitionNeedsCapture, CaptureInRepetition, DuplicateAnnotation,
+  BoundedRepetitionNeedsCapture, DuplicateAnnotation,
   InvalidEscapeSequence, InvalidExclusionOperand, InvalidRangeEndpoint,
   InvertedRange, InvertedRepetitionBounds, NotSubstitutableBody,
   SubstitutionsIgnoreMatchingWithoutSubstitutable, UnknownAnnotation,
@@ -178,8 +178,9 @@ pub fn duplicate_annotation_test() {
 // ---------------------------------------------------------------------------
 
 pub fn capture_inside_repetition_test() {
-  let errs = validate("(%Digit as d) * 3")
-  errs |> should.equal([CaptureInRepetition("d")])
+  // Captures inside repetitions are now always allowed.
+  validate("(%Digit as d) * 3")
+  |> should.equal([])
 }
 
 pub fn capture_outside_repetition_is_valid_test() {
@@ -188,8 +189,8 @@ pub fn capture_outside_repetition_is_valid_test() {
 }
 
 pub fn nested_capture_inside_repetition_test() {
-  let errs = validate("(('a' as inner) * 2) * 3")
-  errs |> has_error(CaptureInRepetition("inner")) |> should.be_true
+  validate("(('a' as inner) * 2) * 3")
+  |> should.equal([])
 }
 
 // ---------------------------------------------------------------------------
@@ -346,8 +347,8 @@ pub fn substitutions_ignore_matching_false_without_substitutable_valid_test() {
   |> should.equal([])
 }
 
-// CaptureInRepetition is still enforced when !substitutable is false/absent.
-pub fn capture_in_repetition_still_errors_without_substitutable_test() {
-  let errs = validate("(%Digit as d) * 3")
-  errs |> has_error(CaptureInRepetition("d")) |> should.be_true
+// Captures inside repetitions are always allowed (not restricted to !substitutable).
+pub fn capture_in_repetition_allowed_without_substitutable_test() {
+  validate("(%Digit as d) * 3")
+  |> should.equal([])
 }

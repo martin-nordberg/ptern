@@ -29,8 +29,16 @@ pub type MatchOccurrence {
   MatchOccurrence(index: Int, length: Int, captures: dict.Dict(String, String))
 }
 
+pub type ReplacementValue {
+  ScalarReplacement(String)
+  ArrayReplacement(List(String))
+}
+
 pub type ReplacementError {
   InvalidReplacementValue(capture_name: String, value: String)
+  WrongReplacementType(capture_name: String)
+  ArrayLengthMismatch(capture_name: String, provided: Int, actual: Int)
+  DuplicateRepetitionCapture(capture_name: String)
 }
 
 pub type SubstitutionError {
@@ -60,6 +68,8 @@ pub opaque type Ptern {
     source: String,
     flags: String,
     capture_validator_list: List(#(String, String)),
+    // Wire format for repetition_info: list of (group_name, sub_source, captures)
+    repetition_info_list: List(#(String, String, List(String))),
   )
 }
 
@@ -70,23 +80,18 @@ pub opaque type Ptern {
 pub fn compile(source: String) -> Result(Ptern, CompileError) {
   use tokens <- result.try(lexer.lex(source) |> result.map_error(LexError))
   use parsed <- result.try(parser.parse(tokens) |> result.map_error(ParseError))
-  let is_substitutable =
-    list.any(parsed.annotations, fn(a) { a.name == "substitutable" && a.value })
   let all_errors =
     list.append(validator.validate(parsed), resolver.resolve(parsed))
-  // When !substitutable = true, duplicate captures are intentional (the same
-  // name in multiple positions supplies the same value, or an array value
-  // consumed sequentially). Filter them out only in that case.
-  let semantic_errors = case is_substitutable {
-    False -> all_errors
-    True ->
-      list.filter(all_errors, fn(e) {
-        case e {
-          semantic_error.DuplicateCapture(_) -> False
-          _ -> True
-        }
-      })
-  }
+  // Duplicate capture names are intentional in all patterns: the same name
+  // in multiple positions means "apply the same replacement value everywhere"
+  // (or, when !substitutable = true, consume an array sequentially).
+  let semantic_errors =
+    list.filter(all_errors, fn(e) {
+      case e {
+        semantic_error.DuplicateCapture(_) -> False
+        _ -> True
+      }
+    })
   case semantic_errors {
     [_, ..] -> Error(SemanticErrors(semantic_errors))
     [] -> {
@@ -121,6 +126,10 @@ pub fn compile(source: String) -> Result(Ptern, CompileError) {
         source: src,
         flags: d_flg,
         capture_validator_list: compiled.capture_validators,
+        repetition_info_list: list.map(
+          compiled.repetition_info,
+          fn(ri) { #(ri.group_name, ri.sub_source, ri.captures) },
+        ),
       ))
     }
   }
@@ -212,74 +221,168 @@ fn build_capture_validators(
   })
 }
 
+fn rep_group_count(
+  rep_info_list: List(#(String, String, List(String))),
+  capture_name: String,
+) -> Int {
+  list.count(rep_info_list, fn(ri) {
+    let #(_, _, caps) = ri
+    list.contains(caps, capture_name)
+  })
+}
+
 fn validate_replacements(
   ptern: Ptern,
-  replacements: dict.Dict(String, String),
+  replacements: dict.Dict(String, ReplacementValue),
 ) -> Result(Nil, ReplacementError) {
-  case ptern.ignore_matching {
-    True -> Ok(Nil)
-    False ->
-      dict.fold(replacements, Ok(Nil), fn(acc, name, value) {
-        case acc {
-          Error(_) -> acc
-          Ok(_) ->
-            case dict.get(ptern.capture_validators, name) {
-              Error(_) -> Ok(Nil)
-              Ok(re) ->
-                case regex.test_re(re, value) {
-                  True -> Ok(Nil)
-                  False -> Error(InvalidReplacementValue(name, value))
+  dict.fold(replacements, Ok(Nil), fn(acc, name, value) {
+    case acc {
+      Error(_) -> acc
+      Ok(_) ->
+        case value {
+          ScalarReplacement(v) ->
+            case ptern.ignore_matching {
+              True -> Ok(Nil)
+              False ->
+                case dict.get(ptern.capture_validators, name) {
+                  Error(_) -> Ok(Nil)
+                  Ok(re) ->
+                    case regex.test_re(re, v) {
+                      True -> Ok(Nil)
+                      False -> Error(InvalidReplacementValue(name, v))
+                    }
                 }
             }
+          ArrayReplacement(vs) -> {
+            let n_reps = rep_group_count(ptern.repetition_info_list, name)
+            case n_reps {
+              0 -> Error(WrongReplacementType(name))
+              1 -> {
+                case ptern.ignore_matching {
+                  True -> Ok(Nil)
+                  False ->
+                    case dict.get(ptern.capture_validators, name) {
+                      Error(_) -> Ok(Nil)
+                      Ok(re) ->
+                        list.fold(vs, Ok(Nil), fn(a, v) {
+                          case a {
+                            Error(_) -> a
+                            Ok(_) ->
+                              case regex.test_re(re, v) {
+                                True -> Ok(Nil)
+                                False -> Error(InvalidReplacementValue(name, v))
+                              }
+                          }
+                        })
+                    }
+                }
+              }
+              _ -> Error(DuplicateRepetitionCapture(name))
+            }
+          }
         }
-      })
-  }
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------
 // Replacing
 // ---------------------------------------------------------------------------
 
+fn split_replacements(
+  replacements: dict.Dict(String, ReplacementValue),
+) -> #(List(#(String, String)), List(#(String, List(String)))) {
+  dict.fold(replacements, #([], []), fn(acc, name, val) {
+    let #(scalars, arrays) = acc
+    case val {
+      ScalarReplacement(v) -> #([#(name, v), ..scalars], arrays)
+      ArrayReplacement(vs) -> #(scalars, [#(name, vs), ..arrays])
+    }
+  })
+}
+
+fn ffi_error_to_replacement_error(
+  errs: List(#(String, Int, Int)),
+) -> ReplacementError {
+  let assert [#(name, provided, actual), ..] = errs
+  ArrayLengthMismatch(name, provided, actual)
+}
+
 /// Replace the match if the entire input matches, otherwise return input unchanged.
-/// Returns `Error(InvalidReplacementValue(...))` when a replacement value does not match
-/// the capture's subpattern (unless `!replacements-ignore-matching = true` is set).
+/// Returns `Error(...)` when a replacement value is invalid.
 pub fn replace_all_of(
   ptern: Ptern,
   input: String,
-  replacements: dict.Dict(String, String),
+  replacements: dict.Dict(String, ReplacementValue),
 ) -> Result(String, ReplacementError) {
   use _ <- result.try(validate_replacements(ptern, replacements))
-  Ok(regex.replace_rich(ptern.full_re, input, dict.to_list(replacements)))
+  let #(scalars, arrays) = split_replacements(replacements)
+  regex.replace_rich_with_arrays(
+    ptern.full_re,
+    input,
+    scalars,
+    arrays,
+    ptern.repetition_info_list,
+    ptern.flags,
+  )
+  |> result.map_error(ffi_error_to_replacement_error)
 }
 
 /// Replace the match at the start of input, otherwise return input unchanged.
 pub fn replace_start_of(
   ptern: Ptern,
   input: String,
-  replacements: dict.Dict(String, String),
+  replacements: dict.Dict(String, ReplacementValue),
 ) -> Result(String, ReplacementError) {
   use _ <- result.try(validate_replacements(ptern, replacements))
-  Ok(regex.replace_rich(ptern.starts_re, input, dict.to_list(replacements)))
+  let #(scalars, arrays) = split_replacements(replacements)
+  regex.replace_rich_with_arrays(
+    ptern.starts_re,
+    input,
+    scalars,
+    arrays,
+    ptern.repetition_info_list,
+    ptern.flags,
+  )
+  |> result.map_error(ffi_error_to_replacement_error)
 }
 
 /// Replace the match at the end of input, otherwise return input unchanged.
 pub fn replace_end_of(
   ptern: Ptern,
   input: String,
-  replacements: dict.Dict(String, String),
+  replacements: dict.Dict(String, ReplacementValue),
 ) -> Result(String, ReplacementError) {
   use _ <- result.try(validate_replacements(ptern, replacements))
-  Ok(regex.replace_rich(ptern.ends_re, input, dict.to_list(replacements)))
+  let #(scalars, arrays) = split_replacements(replacements)
+  regex.replace_rich_with_arrays(
+    ptern.ends_re,
+    input,
+    scalars,
+    arrays,
+    ptern.repetition_info_list,
+    ptern.flags,
+  )
+  |> result.map_error(ffi_error_to_replacement_error)
 }
 
 /// Replace the first occurrence anywhere in the input, otherwise return input unchanged.
 pub fn replace_first_in(
   ptern: Ptern,
   input: String,
-  replacements: dict.Dict(String, String),
+  replacements: dict.Dict(String, ReplacementValue),
 ) -> Result(String, ReplacementError) {
   use _ <- result.try(validate_replacements(ptern, replacements))
-  Ok(regex.replace_rich(ptern.contains_re, input, dict.to_list(replacements)))
+  let #(scalars, arrays) = split_replacements(replacements)
+  regex.replace_rich_with_arrays(
+    ptern.contains_re,
+    input,
+    scalars,
+    arrays,
+    ptern.repetition_info_list,
+    ptern.flags,
+  )
+  |> result.map_error(ffi_error_to_replacement_error)
 }
 
 /// Replace the next occurrence at or after start_index, otherwise return input unchanged.
@@ -287,29 +390,39 @@ pub fn replace_next_in(
   ptern: Ptern,
   input: String,
   start_index: Int,
-  replacements: dict.Dict(String, String),
+  replacements: dict.Dict(String, ReplacementValue),
 ) -> Result(String, ReplacementError) {
   use _ <- result.try(validate_replacements(ptern, replacements))
-  Ok(regex.replace_from_rich(
+  let #(scalars, arrays) = split_replacements(replacements)
+  regex.replace_from_rich_with_arrays(
     ptern.contains_g_re,
     input,
     start_index,
-    dict.to_list(replacements),
-  ))
+    scalars,
+    arrays,
+    ptern.repetition_info_list,
+    ptern.flags,
+  )
+  |> result.map_error(ffi_error_to_replacement_error)
 }
 
 /// Replace all occurrences with the same replacements.
 pub fn replace_all_in(
   ptern: Ptern,
   input: String,
-  replacements: dict.Dict(String, String),
+  replacements: dict.Dict(String, ReplacementValue),
 ) -> Result(String, ReplacementError) {
   use _ <- result.try(validate_replacements(ptern, replacements))
-  Ok(regex.replace_all_rich(
+  let #(scalars, arrays) = split_replacements(replacements)
+  regex.replace_all_rich_with_arrays(
     ptern.contains_g_re,
     input,
-    dict.to_list(replacements),
-  ))
+    scalars,
+    arrays,
+    ptern.repetition_info_list,
+    ptern.flags,
+  )
+  |> result.map_error(ffi_error_to_replacement_error)
 }
 
 // ---------------------------------------------------------------------------

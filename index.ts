@@ -42,6 +42,7 @@ interface GleamCompiledPattern {
   source: string;
   flags: string;
   capture_validator_list: unknown; // Gleam List(#(String, String))
+  repetition_info_list: unknown;   // Gleam List(#(String, String, List(String)))
 }
 
 // Gleam SubstitutionPlan ADT nodes as emitted by the compiler.
@@ -91,17 +92,17 @@ export interface Ptern {
    * Throws `ReplacementError` if a replacement value does not satisfy the capture's
    * subpattern. Set `!replacements-ignore-matching = true` to disable this check.
    */
-  replaceAllOf(input: string, replacements: MatchResult): string;
+  replaceAllOf(input: string, replacements: Record<string, string | string[]>): string;
   /** Replace the match at the start of input, otherwise return input unchanged. */
-  replaceStartOf(input: string, replacements: MatchResult): string;
+  replaceStartOf(input: string, replacements: Record<string, string | string[]>): string;
   /** Replace the match at the end of input, otherwise return input unchanged. */
-  replaceEndOf(input: string, replacements: MatchResult): string;
+  replaceEndOf(input: string, replacements: Record<string, string | string[]>): string;
   /** Replace the first occurrence anywhere in the input, otherwise return input unchanged. */
-  replaceFirstIn(input: string, replacements: MatchResult): string;
+  replaceFirstIn(input: string, replacements: Record<string, string | string[]>): string;
   /** Replace the next occurrence at or after startIndex, otherwise return input unchanged. */
-  replaceNextIn(input: string, startIndex: number, replacements: MatchResult): string;
+  replaceNextIn(input: string, startIndex: number, replacements: Record<string, string | string[]>): string;
   /** Replace all occurrences with the same replacements. */
-  replaceAllIn(input: string, replacements: MatchResult): string;
+  replaceAllIn(input: string, replacements: Record<string, string | string[]>): string;
   /** Minimum number of characters this pattern can match. */
   minLength(): number;
   /**
@@ -122,11 +123,11 @@ export type CompileError =
   | { kind: "ParseError"; message: string }
   | { kind: "SemanticErrors"; errors: string[] };
 
-export type ReplacementError = {
-  kind: "InvalidReplacementValue";
-  captureName: string;
-  value: string;
-};
+export type ReplacementError =
+  | { kind: "InvalidReplacementValue"; captureName: string; value: string }
+  | { kind: "WrongCaptureType"; captureName: string }
+  | { kind: "ArrayLengthMismatch"; captureName: string; provided: number; actual: number }
+  | { kind: "DuplicateRepetitionCapture"; captureName: string };
 
 export type SubstitutionError =
   | { kind: "NotSubstitutable" }
@@ -140,6 +141,11 @@ export type SubstitutionError =
 // Internal implementation
 // ---------------------------------------------------------------------------
 
+interface RepetitionInfo {
+  subSource: string;
+  captures: string[];
+}
+
 class PternImpl implements Ptern {
   private readonly _full: RegExp;
   private readonly _starts: RegExp;
@@ -148,8 +154,13 @@ class PternImpl implements Ptern {
   private readonly _containsG: RegExp;
   private readonly _min: number;
   private readonly _max: number | null;
+  private readonly _flags: string;
   private readonly _ignoreMatching: boolean;
   private readonly _captureValidators: Map<string, RegExp>;
+  // repInfoByGroup: keyed by synthetic group name (e.g. "__rep_0")
+  private readonly _repInfoByGroup: Map<string, RepetitionInfo>;
+  // repGroupForCapture: capture name → which __rep_N group it belongs to
+  private readonly _repGroupForCapture: Map<string, string>;
   private readonly _isSubstitutable: boolean;
   private readonly _ignoreSubstitutionMatching: boolean;
   private readonly _substitutionPlan: GleamPlan | null;
@@ -161,6 +172,7 @@ class PternImpl implements Ptern {
     maxLen: number | null,
     ignoreMatching: boolean,
     captureValidators: Map<string, RegExp>,
+    repInfoByGroup: Map<string, RepetitionInfo>,
     isSubstitutable: boolean,
     ignoreSubstitutionMatching: boolean,
     substitutionPlan: GleamPlan | null,
@@ -173,19 +185,50 @@ class PternImpl implements Ptern {
     this._containsG = new RegExp(source, df.includes("g") ? df : df + "g");
     this._min = minLen;
     this._max = maxLen;
+    this._flags = df;
     this._ignoreMatching = ignoreMatching;
     this._captureValidators = captureValidators;
+    this._repInfoByGroup = repInfoByGroup;
+    this._repGroupForCapture = new Map();
+    for (const [groupName, info] of repInfoByGroup) {
+      for (const cap of info.captures) {
+        this._repGroupForCapture.set(cap, groupName);
+      }
+    }
     this._isSubstitutable = isSubstitutable;
     this._ignoreSubstitutionMatching = ignoreSubstitutionMatching;
     this._substitutionPlan = substitutionPlan;
   }
 
-  private validateReplacements(replacements: MatchResult): void {
-    if (this._ignoreMatching) return;
+  private validateReplacements(replacements: Record<string, string | string[]>): void {
     for (const [name, value] of Object.entries(replacements)) {
-      const re = this._captureValidators.get(name);
-      if (re !== undefined && !re.test(value)) {
-        throw { kind: "InvalidReplacementValue", captureName: name, value } satisfies ReplacementError;
+      if (Array.isArray(value)) {
+        const repCount = [...this._repInfoByGroup.values()].filter(
+          (ri) => ri.captures.includes(name),
+        ).length;
+        if (repCount === 0) {
+          throw { kind: "WrongCaptureType", captureName: name } satisfies ReplacementError;
+        }
+        if (repCount > 1) {
+          throw { kind: "DuplicateRepetitionCapture", captureName: name } satisfies ReplacementError;
+        }
+        if (!this._ignoreMatching) {
+          const re = this._captureValidators.get(name);
+          if (re !== undefined) {
+            for (const elem of value) {
+              if (!re.test(elem)) {
+                throw { kind: "InvalidReplacementValue", captureName: name, value: elem } satisfies ReplacementError;
+              }
+            }
+          }
+        }
+      } else {
+        if (!this._ignoreMatching) {
+          const re = this._captureValidators.get(name);
+          if (re !== undefined && !re.test(value)) {
+            throw { kind: "InvalidReplacementValue", captureName: name, value } satisfies ReplacementError;
+          }
+        }
       }
     }
   }
@@ -260,73 +303,138 @@ class PternImpl implements Ptern {
     return results;
   }
 
-  // Build the replacement text for a single match, substituting named captures.
-  // Requires the regex to have the 'd' flag so that m.indices.groups is populated.
-  private static applyReplacements(
+  // Build the replacement text for a single match.
+  // Returns the modified match text (same length or different).
+  private applyReplacements(
     m: RegExpExecArray & { indices?: { groups?: Record<string, [number, number] | undefined> } },
-    replacements: MatchResult,
+    input: string,
+    replacements: Record<string, string | string[]>,
   ): string {
     const matchStart = m.index;
     const groupIndices = m.indices?.groups ?? {};
+    type Patch = { absStart: number; absEnd: number; newVal: string };
+    const patches: Patch[] = [];
+
+    const subFlags = this._flags.replace(/[gd]/g, "") + "dg";
+
+    // Helper: collect per-iteration spans for a capture inside a rep group.
+    const collectIterSpans = (name: string, repGroupName: string): { outerSpan: [number, number] | undefined; iterSpans: [number, number][] } => {
+      const repSpan = groupIndices[repGroupName];
+      if (repSpan === undefined) return { outerSpan: undefined, iterSpans: [] };
+      const outerSpan = groupIndices[name];
+      const hasOuter = outerSpan !== undefined && outerSpan[0] < repSpan[0];
+      const info = this._repInfoByGroup.get(repGroupName)!;
+      const subRe = new RegExp(info.subSource, subFlags);
+      subRe.lastIndex = repSpan[0];
+      const iterSpans: [number, number][] = [];
+      let mi: RegExpExecArray | null;
+      while ((mi = subRe.exec(input)) !== null && mi.index < repSpan[1]) {
+        const ig = (mi as typeof mi & { indices?: { groups?: Record<string, [number, number]> } }).indices?.groups;
+        const sp = ig?.[name];
+        if (sp !== undefined) iterSpans.push(sp);
+        if (mi[0].length === 0) subRe.lastIndex++;
+      }
+      return { outerSpan: hasOuter ? outerSpan : undefined, iterSpans };
+    };
+
+    for (const [name, value] of Object.entries(replacements)) {
+      if (!Array.isArray(value)) {
+        // Scalar: broadcast to all occurrences (outer + all rep iterations if inside a rep).
+        const repGroupName = this._repGroupForCapture.get(name);
+        if (repGroupName !== undefined) {
+          const { outerSpan, iterSpans } = collectIterSpans(name, repGroupName);
+          if (outerSpan !== undefined) {
+            patches.push({ absStart: outerSpan[0], absEnd: outerSpan[1], newVal: value });
+          }
+          for (const sp of iterSpans) {
+            patches.push({ absStart: sp[0], absEnd: sp[1], newVal: value });
+          }
+        } else {
+          const span = groupIndices[name];
+          if (span !== undefined) {
+            patches.push({ absStart: span[0], absEnd: span[1], newVal: value });
+          }
+        }
+      } else {
+        // Array: two-pass over the repetition span.
+        const repGroupName = this._repGroupForCapture.get(name);
+        if (repGroupName === undefined) continue;
+        const repSpan = groupIndices[repGroupName];
+        if (repSpan === undefined) continue; // zero-iteration optional repetition
+
+        const { outerSpan, iterSpans } = collectIterSpans(name, repGroupName);
+        const arrayOffset = outerSpan !== undefined ? 1 : 0;
+        if (outerSpan !== undefined) {
+          patches.push({ absStart: outerSpan[0], absEnd: outerSpan[1], newVal: value[0]! });
+        }
+
+        const k = iterSpans.length;
+        const provided = value.length - arrayOffset;
+        if (provided !== k) {
+          throw { kind: "ArrayLengthMismatch", captureName: name, provided: value.length, actual: k + arrayOffset } satisfies ReplacementError;
+        }
+        for (let i = 0; i < k; i++) {
+          patches.push({ absStart: iterSpans[i]![0], absEnd: iterSpans[i]![1], newVal: value[arrayOffset + i]! });
+        }
+      }
+    }
+
+    // Apply patches right-to-left within match text
+    patches.sort((a, b) => b.absStart - a.absStart);
     let matchText = m[0];
-    const patches = Object.entries(replacements)
-      .filter(([name]) => groupIndices[name] !== undefined)
-      .map(([name, newVal]) => ({
-        relStart: groupIndices[name]![0] - matchStart,
-        relEnd: groupIndices[name]![1] - matchStart,
-        newVal,
-      }))
-      .sort((a, b) => b.relStart - a.relStart);
-    for (const { relStart, relEnd, newVal } of patches) {
-      matchText = matchText.slice(0, relStart) + newVal + matchText.slice(relEnd);
+    for (const { absStart, absEnd, newVal } of patches) {
+      const rel0 = absStart - matchStart;
+      const rel1 = absEnd - matchStart;
+      matchText = matchText.slice(0, rel0) + newVal + matchText.slice(rel1);
     }
     return matchText;
   }
 
-  private spliceReplacement(input: string, m: RegExpExecArray, replacements: MatchResult): string {
-    const newText = PternImpl.applyReplacements(
+  private spliceReplacement(input: string, m: RegExpExecArray, replacements: Record<string, string | string[]>): string {
+    const newText = this.applyReplacements(
       m as RegExpExecArray & { indices?: { groups?: Record<string, [number, number] | undefined> } },
+      input,
       replacements,
     );
     return input.slice(0, m.index) + newText + input.slice(m.index + m[0].length);
   }
 
-  replaceAllOf(input: string, replacements: MatchResult): string {
+  replaceAllOf(input: string, replacements: Record<string, string | string[]>): string {
     this.validateReplacements(replacements);
     this._full.lastIndex = 0;
     const m = this._full.exec(input);
     return m === null ? input : this.spliceReplacement(input, m, replacements);
   }
 
-  replaceStartOf(input: string, replacements: MatchResult): string {
+  replaceStartOf(input: string, replacements: Record<string, string | string[]>): string {
     this.validateReplacements(replacements);
     this._starts.lastIndex = 0;
     const m = this._starts.exec(input);
     return m === null ? input : this.spliceReplacement(input, m, replacements);
   }
 
-  replaceEndOf(input: string, replacements: MatchResult): string {
+  replaceEndOf(input: string, replacements: Record<string, string | string[]>): string {
     this.validateReplacements(replacements);
     this._ends.lastIndex = 0;
     const m = this._ends.exec(input);
     return m === null ? input : this.spliceReplacement(input, m, replacements);
   }
 
-  replaceFirstIn(input: string, replacements: MatchResult): string {
+  replaceFirstIn(input: string, replacements: Record<string, string | string[]>): string {
     this.validateReplacements(replacements);
     this._contains.lastIndex = 0;
     const m = this._contains.exec(input);
     return m === null ? input : this.spliceReplacement(input, m, replacements);
   }
 
-  replaceNextIn(input: string, startIndex: number, replacements: MatchResult): string {
+  replaceNextIn(input: string, startIndex: number, replacements: Record<string, string | string[]>): string {
     this.validateReplacements(replacements);
     this._containsG.lastIndex = startIndex;
     const m = this._containsG.exec(input);
     return m === null ? input : this.spliceReplacement(input, m, replacements);
   }
 
-  replaceAllIn(input: string, replacements: MatchResult): string {
+  replaceAllIn(input: string, replacements: Record<string, string | string[]>): string {
     this.validateReplacements(replacements);
     this._containsG.lastIndex = 0;
     const parts: string[] = [];
@@ -334,8 +442,9 @@ class PternImpl implements Ptern {
     let m: RegExpExecArray | null;
     while ((m = this._containsG.exec(input)) !== null) {
       parts.push(input.slice(lastEnd, m.index));
-      parts.push(PternImpl.applyReplacements(
+      parts.push(this.applyReplacements(
         m as RegExpExecArray & { indices?: { groups?: Record<string, [number, number] | undefined> } },
+        input,
         replacements,
       ));
       lastEnd = m.index + m[0].length;
@@ -416,8 +525,6 @@ export function compile(source: string): Ptern {
             return `Duplicate capture: ${ev["name"]}`;
           case "CaptureDefinitionConflict":
             return `Capture/definition conflict: ${ev["name"]}`;
-          case "CaptureInRepetition":
-            return `Named capture inside repetition: ${ev["name"]}`;
           case "InvalidRangeEndpoint":
             return `Invalid range endpoint: ${ev["content"]}`;
           case "InvertedRange":
@@ -462,6 +569,16 @@ export function compile(source: string): Ptern {
     }
   }
 
+  // Parse repetition_info_list: List(#(String, String, List(String)))
+  const riEntries = gleamListToArray(cp.repetition_info_list) as Array<[string, string, unknown]>;
+  const repInfoByGroup = new Map<string, RepetitionInfo>();
+  for (const [groupName, subSource, capsGleam] of riEntries) {
+    repInfoByGroup.set(groupName, {
+      subSource,
+      captures: gleamListToArray(capsGleam) as string[],
+    });
+  }
+
   const substitutionPlan =
     cp.substitution_plan[0] !== undefined
       ? (cp.substitution_plan[0] as GleamPlan)
@@ -474,6 +591,7 @@ export function compile(source: string): Ptern {
     maxLen,
     cp.ignore_matching,
     captureValidators,
+    repInfoByGroup,
     cp.is_substitutable,
     cp.ignore_substitution_matching,
     substitutionPlan,

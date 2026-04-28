@@ -31,9 +31,16 @@ Replacement and substitution share a common structure — both take a capture-va
 | Missing capture | Error (unless expression is substitutable) | Original matched text preserved |
 | Branch/iteration selection | Driven by captures dict | Driven by the original regex match |
 | Requires `!substitutable = true` | Yes | No |
-| Capture value validation | Optional (`!substitutions-ignore-matching`) | TODO (see Open Issues) |
+| Capture value validation | Optional (`!substitutions-ignore-matching`) | Optional (`!replacements-ignore-matching`) |
 | Array values for repetitions | Yes — drives iteration count | Yes — replaces per-iteration values |
 | Return value | Assembled string | Modified original string; original unchanged if no match |
+
+## Annotations
+
+```
+!replacements-ignore-matching = true
+```
+When true, provided replacement values are not validated against the sub-expression's regex during replace operations. Default is `false` (validation enabled). Applies only to replacement operations; has no effect on `substitute()`.
 
 ## Definitions
 
@@ -61,12 +68,14 @@ Produces the original matched character. Not a replacement point.
 
 ### Named Capture — `E as name`
 1. If `name ∈ captures` and `captures[name]` is a `string`:
-   - Optionally validate that `captures[name]` matches `E`'s regex (see Open Issues).
+   - If `!replacements-ignore-matching = false`: validate that `captures[name]` matches `E`'s regex. If not: error.
    - Return `captures[name]`. Evaluation of `E` is skipped; any inner captures in `captures` are silently ignored.
 2. If `name ∈ captures` and `captures[name]` is a `string[]`: error — scalar value required for a non-repetition capture.
 3. If `name ∉ captures`: return `replace(E, captures, original, span_of_E)`.
 
 Rule 1 short-circuits at the outer capture, identical in structure to substitution. If `name` is present, inner capture values in the dict are silently ignored — the inner expression is not evaluated and the provided value replaces the entire matched span for `name`, subsuming all inner capture spans.
+
+**Multiple occurrences of the same name**: When a capture name appears at more than one position in the pattern, the same replacement value applies uniformly to every occurrence. A scalar value replaces all non-repetition occurrences identically. An array value applies to all occurrences inside a single repetition (per-iteration semantics); if the same name appears inside two distinct repetitions, the array cannot be consistently distributed and is a runtime error (`DuplicateRepetitionCapture`).
 
 ### Sequence — `E1 E2 ... En`
 ```
@@ -121,10 +130,6 @@ replace(E, captures_with_scalars_for_iter_i, original, span_of_iter_i)
 ```
 where `captures_with_scalars_for_iter_i` replaces each `string[]` value `captures[name]` with the scalar `captures[name][i]`, leaving broadcast strings unchanged.
 
-TODO: Should the actual iteration count `k` be required to equal a provided array length, or should shorter arrays be accepted (replacing only the first `len` iterations)? Options:
-- (A) Require exact length match (`len = k`); error if they differ.
-- (B) Accept `len ≤ k`; replace the first `len` iterations and leave the rest unchanged.
-
 **Implementation note**: Capturing per-iteration spans requires the two-pass approach described in `match-array.md`. The main regex (with `d` flag) identifies the span of the entire repetition; a sub-regex with the `g` flag is then applied within that span to extract per-iteration spans. This is a prerequisite for both array-valued replacement and array-valued matching.
 
 ## Runtime Errors
@@ -132,8 +137,9 @@ TODO: Should the actual iteration count `k` be required to equal a provided arra
 The following are detected at call time:
 
 - A provided capture value is a `string[]` for a capture that is not inside a repetition.
-- A provided array has length ≠ `k` (the actual iteration count from the original match), when exact-length matching is required.
-- When capture-value validation is enabled (see Open Issues): a provided value does not match the sub-expression's regex.
+- A provided array has length ≠ `k` (the actual iteration count from the original match).
+- A capture name with an array value appears inside more than one distinct repetition.
+- When `!replacements-ignore-matching = false`: a provided replacement value does not match the sub-expression's regex.
 
 Unlike substitution, a missing capture is never a runtime error. The original matched text is always a valid fallback.
 
@@ -151,16 +157,21 @@ replaceAllIn(input: string,    replacements: Record<string, string | string[]>):
 
 Each method returns the modified string, or the original `input` unchanged if the ptern does not match. Extra keys in `replacements` that do not correspond to any named capture in the ptern (including captures from unmatched alternation branches) are silently ignored.
 
-The `replacements` parameter type changes from the current `Record<string, string>` to `Record<string, string | string[]>` to accommodate array-valued captures inside repetitions. This is a breaking change to the existing API.
-
-TODO: Should the extended type `Record<string, string | string[]>` be introduced immediately (as a superset of the current type), or should it be gated behind a flag or a new method family?
+The `replacements` parameter type is `Record<string, string | string[]>` to accommodate array-valued captures inside repetitions. This changes the current `Record<string, string>` and is a breaking change to the existing API.
 
 ## Language Bindings
 
-- **Gleam**: `ptern.replace_first_in(ptern, input, replacements)` etc. return `String` (the original if no match) or `Result(String, ReplacementError)` if validation errors are possible.
+- **Gleam**: `ptern.replace_first_in(ptern, input, replacements)` etc. return `String` (the original if no match) or `Result(String, ReplacementError)` when validation is enabled.
 - **TypeScript**: Replacement methods throw on validation error. They return `input` unchanged if no match.
 
-TODO: If capture-value validation is added, define `ReplacementError` variants analogous to `SubstitutionError`.
+```gleam
+pub type ReplacementError {
+  CaptureMismatch(name: String, value: String)
+  WrongCaptureType(name: String)
+  ArrayLengthMismatch(name: String, provided: Int, actual: Int)
+  DuplicateRepetitionCapture(name: String)
+}
+```
 
 ## Examples
 
@@ -221,17 +232,3 @@ tagged.replaceFirstIn("<em>hello</em>", { tag: "strong", body: "world" })
 // Both captures replaced; `tag` appears in two positions and both are updated.
 ```
 
-## Open Issues
-
-1. **Capture-value validation**: Should replacement validate provided values against the sub-expression's regex, symmetric with `!substitutions-ignore-matching` in substitution? Options:
-   - (A) Add `!replacements-ignore-matching = true` annotation with the same semantics.
-   - (B) Add `!replacements-validate-matching = true` annotation (opt-in rather than opt-out, since replacement has no existing validation).
-   - (C) No validation in replacement; the original text was already valid, and replacement values are the caller's responsibility.
-
-2. **Array length matching**: Exact-length requirement vs. partial replacement for arrays shorter than the actual iteration count — see TODO in Bounded Repetition above.
-
-3. **API type migration**: Whether to introduce `string | string[]` immediately as a breaking change, or provide a migration path.
-
-4. **Gleam `ReplacementError` variants**: If validation is added, define the error type analogously to `SubstitutionError`.
-
-5. **Capture name appearing in multiple positions**: When a named capture appears more than once in the pattern (e.g., `{tag}` at open and close), a single replacement value must apply consistently to all positions. This is implicitly required but not stated. Should mismatched values (e.g., different per-iteration values for two distinct occurrences of the same capture name) be an error?

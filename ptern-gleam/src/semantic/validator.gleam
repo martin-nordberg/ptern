@@ -9,12 +9,11 @@ import parser/ast.{
   PositionAssertion, RepCount, Sequence, SingleAtom,
 }
 import semantic/error.{
-  type SemanticError, BoundedRepetitionNeedsCapture, CaptureInRepetition,
-  DuplicateAnnotation, InvalidEscapeSequence, InvalidExclusionOperand,
-  InvalidRangeEndpoint, InvertedRange, InvertedRepetitionBounds,
-  NotSubstitutableBody, PositionAssertionInRepetition,
-  SubstitutionsIgnoreMatchingWithoutSubstitutable, UnknownAnnotation,
-  UnknownPositionAssertion,
+  type SemanticError, BoundedRepetitionNeedsCapture, DuplicateAnnotation,
+  InvalidEscapeSequence, InvalidExclusionOperand, InvalidRangeEndpoint,
+  InvertedRange, InvertedRepetitionBounds, NotSubstitutableBody,
+  PositionAssertionInRepetition, SubstitutionsIgnoreMatchingWithoutSubstitutable,
+  UnknownAnnotation, UnknownPositionAssertion,
 }
 
 /// Run all constraint checks on a parsed Ptern, returning every error found.
@@ -106,8 +105,8 @@ fn validate_definitions(defs: List(Definition)) -> List(SemanticError) {
 // ---------------------------------------------------------------------------
 // Expression tree walk
 // `inside_rep` is True when nested inside a counted repetition.
-// `is_subst` is True when `!substitutable = true` is set — relaxes
-// CaptureInRepetition and enforces BoundedRepetitionNeedsCapture.
+// `is_subst` is True when `!substitutable = true` is set — enforces
+// BoundedRepetitionNeedsCapture.
 // ---------------------------------------------------------------------------
 
 fn validate_expression(
@@ -140,16 +139,10 @@ fn validate_capture(
   is_subst: Bool,
   def_bodies: Dict(String, Expression),
 ) -> List(SemanticError) {
-  let name_errs = case inside_rep, is_subst, cap.name {
-    True, False, Some(name) -> [CaptureInRepetition(name)]
-    _, _, _ -> []
-  }
   // When this capture has a name it acts as a substitution point for its
   // inner repetition, so bounded-rep-needs-capture should not fire for it.
   let covered = is_subst && cap.name != option.None
-  let inner_errs =
-    validate_repetition(cap.inner, inside_rep, is_subst, covered, def_bodies)
-  list.append(name_errs, inner_errs)
+  validate_repetition(cap.inner, inside_rep, is_subst, covered, def_bodies)
 }
 
 fn validate_repetition(

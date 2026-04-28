@@ -698,3 +698,215 @@ fn collect_validators_in_atom(
     _ -> []
   }
 }
+
+// ---------------------------------------------------------------------------
+// RepetitionInfo and compile-with-rep-info variants
+//
+// These parallel the compile_expression / compile_capture / compile_repetition
+// family but thread an integer counter, accumulate RepetitionInfo entries, and
+// track a `seen` list of capture names already emitted as named groups.
+//
+// The `seen` mechanism ensures the FIRST occurrence of any capture name gets
+// a `(?<name>...)` group in the main regex; subsequent occurrences (which JS
+// regex would reject as duplicate named groups) are suppressed to `(?:...)`.
+// This is important for "outer + rep" patterns like:
+//   {field} as col (',' {field} as col) * 0..20
+// where the outer `col` gets the named group (enabling span-based replacement)
+// and the inner `col` is suppressed in the main regex but kept in the sub-regex
+// used by the two-pass per-iteration replacement.
+// ---------------------------------------------------------------------------
+
+pub type RepetitionInfo {
+  RepetitionInfo(
+    // Synthetic named group wrapping the whole repetition in the main regex.
+    group_name: String,
+    // Regex source for one iteration of the repetition (named capture groups
+    // present, no suppression). Used for two-pass per-iteration span extraction.
+    sub_source: String,
+    // Named capture names that appear inside one iteration of the repetition.
+    captures: List(String),
+  )
+}
+
+// Public entry point: compile expression into regex source, RepetitionInfo list,
+// and updated counter. `seen` is initialised empty internally.
+pub fn compile_expression_with_rep_info(
+  expr: Expression,
+  defs: Dict(String, String),
+  counter: Int,
+) -> #(String, List(RepetitionInfo), Int) {
+  let #(src, infos, new_ctr, _seen) =
+    compile_expression_ri(expr, defs, counter, [])
+  #(src, infos, new_ctr)
+}
+
+// Internal: also returns updated `seen` list so callers can propagate it.
+fn compile_expression_ri(
+  expr: Expression,
+  defs: Dict(String, String),
+  counter: Int,
+  seen: List(String),
+) -> #(String, List(RepetitionInfo), Int, List(String)) {
+  let Alternation(seqs) = expr
+  let mergeable = case seqs {
+    [_, _, ..] -> list.all(seqs, is_class_item)
+    _ -> False
+  }
+  case mergeable {
+    True -> #(
+      "[" <> string.concat(list.map(seqs, sequence_as_class_body)) <> "]",
+      [],
+      counter,
+      seen,
+    )
+    False -> {
+      let #(rev_parts, infos, final_ctr, final_seen) =
+        list.fold(seqs, #([], [], counter, seen), fn(acc, seq) {
+          let #(parts, all_infos, ctr, cur_seen) = acc
+          let #(s, new_infos, new_ctr, new_seen) =
+            compile_sequence_ri(seq, defs, ctr, cur_seen)
+          #([s, ..parts], list.append(all_infos, new_infos), new_ctr, new_seen)
+        })
+      #(string.join(list.reverse(rev_parts), "|"), infos, final_ctr, final_seen)
+    }
+  }
+}
+
+fn compile_sequence_ri(
+  seq: Sequence,
+  defs: Dict(String, String),
+  counter: Int,
+  seen: List(String),
+) -> #(String, List(RepetitionInfo), Int, List(String)) {
+  let Sequence(items) = seq
+  let #(rev_parts, infos, final_ctr, final_seen) =
+    list.fold(items, #([], [], counter, seen), fn(acc, cap) {
+      let #(parts, all_infos, ctr, cur_seen) = acc
+      let #(s, new_infos, new_ctr, new_seen) =
+        compile_capture_ri(cap, defs, ctr, cur_seen)
+      #([s, ..parts], list.append(all_infos, new_infos), new_ctr, new_seen)
+    })
+  #(string.join(list.reverse(rev_parts), ""), infos, final_ctr, final_seen)
+}
+
+fn compile_capture_ri(
+  cap: Capture,
+  defs: Dict(String, String),
+  counter: Int,
+  seen: List(String),
+) -> #(String, List(RepetitionInfo), Int, List(String)) {
+  let #(body, infos, new_ctr, new_seen) =
+    compile_repetition_ri(cap.inner, defs, counter, seen)
+  case cap.name {
+    None -> #(body, infos, new_ctr, new_seen)
+    Some(name) ->
+      case list.contains(new_seen, name) {
+        // Already emitted this name → suppress to avoid duplicate named groups.
+        True -> #("(?:" <> body <> ")", infos, new_ctr, new_seen)
+        // First occurrence → emit named group and record in seen.
+        False -> #(
+          "(?<" <> name <> ">" <> body <> ")",
+          infos,
+          new_ctr,
+          [name, ..new_seen],
+        )
+      }
+  }
+}
+
+fn compile_repetition_ri(
+  rep: Repetition,
+  defs: Dict(String, String),
+  counter: Int,
+  seen: List(String),
+) -> #(String, List(RepetitionInfo), Int, List(String)) {
+  case rep.count {
+    None -> compile_exclusion_ri(rep.inner, defs, counter, seen)
+    Some(rc) -> {
+      let inner_caps = collect_all_capture_names_excl(rep.inner)
+      case inner_caps {
+        [] -> {
+          // No named captures in body; recurse for nested reps but no wrapper.
+          let #(body, infos, new_ctr, new_seen) =
+            compile_exclusion_ri(rep.inner, defs, counter, seen)
+          #(wrap_if_needed(body) <> compile_quantifier(rc), infos, new_ctr, new_seen)
+        }
+        caps -> {
+          // Named captures in body — wrap the whole repetition in __rep_N.
+          let rep_name = "__rep_" <> int.to_string(counter)
+          let #(main_body, inner_infos, new_ctr, new_seen) =
+            compile_exclusion_ri(rep.inner, defs, counter + 1, seen)
+          // Sub-regex: one iteration, no seen-suppression (named groups present).
+          let sub_source = compile_exclusion(rep.inner, defs, [])
+          let main =
+            "(?<"
+            <> rep_name
+            <> ">"
+            <> wrap_if_needed(main_body)
+            <> compile_quantifier(rc)
+            <> ")"
+          let info = RepetitionInfo(rep_name, sub_source, caps)
+          #(main, [info, ..inner_infos], new_ctr, new_seen)
+        }
+      }
+    }
+  }
+}
+
+fn compile_exclusion_ri(
+  excl: Exclusion,
+  defs: Dict(String, String),
+  counter: Int,
+  seen: List(String),
+) -> #(String, List(RepetitionInfo), Int, List(String)) {
+  case excl.excluded {
+    None -> compile_range_item_ri(excl.base, defs, counter, seen)
+    Some(excl_item) -> {
+      let base_class = range_item_as_class_operand(excl.base, defs)
+      let excl_class = range_item_as_class_operand(excl_item, defs)
+      #("[" <> base_class <> "--" <> excl_class <> "]", [], counter, seen)
+    }
+  }
+}
+
+fn compile_range_item_ri(
+  item: RangeItem,
+  defs: Dict(String, String),
+  counter: Int,
+  seen: List(String),
+) -> #(String, List(RepetitionInfo), Int, List(String)) {
+  case item {
+    SingleAtom(atom) -> compile_atom_ri(atom, defs, counter, seen)
+    CharRange(Literal(from_raw), Literal(to_raw)) -> #(
+      "[" <> raw_to_class_char(from_raw) <> "-" <> raw_to_class_char(to_raw) <> "]",
+      [],
+      counter,
+      seen,
+    )
+    CharRange(_, _) -> #("(?!)", [], counter, seen)
+  }
+}
+
+fn compile_atom_ri(
+  atom: Atom,
+  defs: Dict(String, String),
+  counter: Int,
+  seen: List(String),
+) -> #(String, List(RepetitionInfo), Int, List(String)) {
+  case atom {
+    Literal(raw) -> #(raw_to_regex(raw), [], counter, seen)
+    CharClass(name) -> #(char_class_standalone(name), [], counter, seen)
+    Interpolation(name) -> #(
+      "(?:" <> result.unwrap(dict.get(defs, name), "(?!)") <> ")",
+      [],
+      counter,
+      seen,
+    )
+    Group(expr) -> {
+      let #(inner, infos, new_ctr, new_seen) =
+        compile_expression_ri(expr, defs, counter, seen)
+      #("(?:" <> inner <> ")", infos, new_ctr, new_seen)
+    }
+    PositionAssertion(name) -> #(compile_position_assertion(name), [], counter, seen)
+  }
+}

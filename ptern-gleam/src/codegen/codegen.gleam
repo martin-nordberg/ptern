@@ -1,4 +1,4 @@
-import codegen/regex
+import codegen/regex.{type RepetitionInfo}
 import codegen/substitution
 import gleam/dict
 import gleam/list
@@ -27,6 +27,9 @@ pub type CompiledPtern {
     ignore_substitution_matching: Bool,
     /// The substitution plan, present only when is_substitutable is True.
     substitution_plan: Option(substitution.SubstitutionPlan),
+    /// Metadata for repetitions that contain named captures, used by the TypeScript
+    /// layer for two-pass per-iteration array replacement.
+    repetition_info: List(RepetitionInfo),
   )
 }
 
@@ -40,15 +43,9 @@ pub fn compile(ptern: ast.ParsedPtern) -> CompiledPtern {
     list.any(ptern.annotations, fn(a) {
       a.name == "substitutions-ignore-matching" && a.value
     })
-  // When substitutable, duplicate capture names are allowed (same name in
-  // multiple positions). The compiled regex cannot have duplicate named groups,
-  // so suppress the names of any capture that appears more than once.
-  let suppressed = case is_subst {
-    False -> []
-    True -> regex.find_duplicate_capture_names(ptern.body)
-  }
   let defs = regex.compile_definitions(ptern.definitions)
-  let source = regex.compile_expression(ptern.body, defs, suppressed)
+  let #(source, rep_info, _) =
+    regex.compile_expression_with_rep_info(ptern.body, defs, 0)
   let validators = regex.collect_capture_validators(ptern.body, defs)
   let def_bodies =
     list.fold(ptern.definitions, dict.new(), fn(acc, def) {
@@ -58,5 +55,5 @@ pub fn compile(ptern: ast.ParsedPtern) -> CompiledPtern {
     False -> None
     True -> Some(substitution.build_plan(ptern.body, def_bodies))
   }
-  CompiledPtern(source, flags, ignore, validators, is_subst, ignore_subst, plan)
+  CompiledPtern(source, flags, ignore, validators, is_subst, ignore_subst, plan, rep_info)
 }
