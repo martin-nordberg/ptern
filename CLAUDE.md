@@ -6,12 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Ptern** is a Gleam library (JavaScript target) that compiles a readable pattern language (called "pterns") into regular expressions. The goal is to provide an alternative to regex that is far more readable while preserving the power of pattern matching, capturing, replacement, and substitution.
 
-The public API of a compiled ptern (the `Ptern` interface in `index.ts`) includes:
-- Boolean tests: `matchesAllOf()`, `matchesStartOf()`, `matchesEndOf()`, `matchesIn()`
-- Occurrence queries: `matchAllOf()`, `matchStartOf()`, `matchEndOf()`, `matchFirstIn()`, `matchNextIn(startIndex)`, `matchAllIn()` — return `MatchOccurrence | null` (or `MatchOccurrence[]`), where `MatchOccurrence` carries `index`, `length`, and `captures`
-- Replacements: `replaceAllOf(replacements)`, `replaceStartOf(replacements)`, `replaceEndOf(replacements)`, `replaceFirstIn(replacements)`, `replaceNextIn(startIndex, replacements)`, `replaceAllIn(replacements)` — take a `Record<string, string | string[]>` replacements dict, return the modified string (or the original if no match)
-- Substitution: `substitute(captures)` — assembles a string from capture values without an original input string; requires `!substitutable = true`
-- Metadata: `maxLength()`, `minLength()`
+The public Gleam API (in `ptern-gleam/src/ptern.gleam`) includes:
+- Boolean tests: `matches_all_of`, `matches_start_of`, `matches_end_of`, `matches_in`
+- Occurrence queries: `match_all_of`, `match_start_of`, `match_end_of`, `match_first_in`, `match_next_in`, `match_all_in` — return `Option(MatchOccurrence)` (or `List(MatchOccurrence)`), where `MatchOccurrence` carries `index`, `length`, and `captures: Dict(String, String)`
+- Replacements: `replace_all_of`, `replace_start_of`, `replace_end_of`, `replace_first_in`, `replace_next_in`, `replace_all_in` — take a `Dict(String, ReplacementValue)` and return `Result(String, ReplacementError)`
+- Substitution: `substitute` — assembles a string from capture values without an original input string; requires `!substitutable = true`; returns `Result(String, SubstitutionError)`
+- Metadata: `max_length`, `min_length`
 
 All internal regexes use the JavaScript `d` flag (`hasIndices`) to resolve per-capture positions precisely for replacement. The `v` flag (Unicode sets mode) is always set.
 
@@ -23,9 +23,6 @@ gleam build          # Build the Gleam library to ptern-gleam/build/dev/javascri
 gleam test           # Run all Gleam tests
 gleam check          # Type-check without building
 gleam add <package>  # Add a dependency
-
-# Run from the repo root:
-bun index.ts         # Run the TypeScript wrapper (requires gleam build first)
 ```
 
 The Gleam project targets JavaScript only (`target = "javascript"` in `ptern-gleam/gleam.toml`) and runs on Bun.
@@ -46,11 +43,11 @@ The Gleam project targets JavaScript only (`target = "javascript"` in `ptern-gle
   - `test/semantic/` — `validator_test.gleam`, `resolver_test.gleam`
   - `test/codegen/` — `codegen_test.gleam`
   - `gleam.toml` — Gleam project manifest
+  - `doc/user-guide.md` — user guide with Gleam API examples
   - `build/` — generated JavaScript output (gitignored)
-- `index.ts` — TypeScript public API: `ptern` tagged template literal, `compile()`, and the `Ptern` interface
 - `documentation/` — language documentation
   - `ptern-specification.md` — full formal language specification (grammar, semantics, all operations)
-  - `user-guide.md` — quick-reference tables, operator summary, and worked examples
+  - `ideas/` — planning documents (backtracking avoidance, multi-language strategy)
 
 ## Ptern Language
 

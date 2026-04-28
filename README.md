@@ -36,71 +36,53 @@ dd = '0' '1'..'9' | '1'..'2' %Digit | '3' '0'..'1';
 It is way more verbose than the corresponding regular expression, but it is also far more readable.
 We think that's true even if you haven't yet learned the Ptern grammar.
 
-Here's how that example ptern can be put to use (shown using the TypeScript API — see [Language Support](#language-support)):
+Here's how that example ptern can be put to use with the Gleam API:
 
+```gleam
+import gleam/dict
+import ptern
+
+let assert Ok(iso_date) = ptern.compile("
+  yyyy = %Digit * 4;
+  mm = '0' '1'..'9' | '1' '0'..'2';
+  dd = '0' '1'..'9' | '1'..'2' %Digit | '3' '0'..'1';
+  {yyyy} as year '-' {mm} as month '-' {dd} as day
+")
+
+ptern.matches_all_of(iso_date, "2026-07-04")                        // True
+ptern.matches_start_of(iso_date, "2026-07-04T12:00")                // True
+ptern.matches_end_of(iso_date, "Independence Day is 2026-07-04")    // True
+ptern.matches_in(iso_date, "Independence Day 2026-07-04 - the 250th")  // True
+
+ptern.match_all_of(iso_date, "2026-07-04")
+// Some(MatchOccurrence(index: 0, length: 10, captures: ...))
+
+ptern.match_first_in(iso_date, "Independence Day 2026-07-04 - the 250th")
+// Some(MatchOccurrence(index: 17, length: 10, captures: ...))
+
+ptern.match_all_in(iso_date, "2026-07-04 and 2026-12-25")
+// [MatchOccurrence(index: 0, ...), MatchOccurrence(index: 15, ...)]
+
+ptern.replace_first_in(iso_date, "Independence Day 2026-07-04 - the 250th",
+  dict.from_list([#("year", ptern.ScalarReplacement("2027"))]))
+// Ok("Independence Day 2027-07-04 - the 250th")
+
+ptern.replace_all_in(iso_date, "2026-07-04 and 2026-12-25",
+  dict.from_list([#("year", ptern.ScalarReplacement("2027"))]))
+// Ok("2027-07-04 and 2027-12-25")
 ```
-isoDate.matchesAllOf("2026-07-04")
-// true
 
-isoDate.matchesStartOf("2026-07-04T12:00")
-// true
+A ptern also offers metadata about the pattern itself:
 
-isoDate.matchesEndOf("Independence Day is 2026-07-04")
-// true
-
-isoDate.matchesIn("Independence Day 2026-07-04 - the 250th")
-// true
-
-isoDate.matchAllOf("2026-07-04")
-// { index: 0, length: 10, captures: { year: "2026", month: "07", day: "04" } }
-
-isoDate.matchFirstIn("Independence Day 2026-07-04 - the 250th")
-// { index: 17, length: 10, captures: { year: "2026", month: "07", day: "04" } }
-
-isoDate.matchAllIn("2026-07-04 and 2026-12-25")
-// [
-//   { index: 0,  length: 10, captures: { year: "2026", month: "07", day: "04" } },
-//   { index: 15, length: 10, captures: { year: "2026", month: "12", day: "25" } }
-// ]
-
-isoDate.replaceFirstIn("Independence Day 2026-07-04 - the 250th", { year: "2027" })
-// "Independence Day 2027-07-04 - the 250th"
-
-isoDate.replaceAllIn("2026-07-04 and 2026-12-25", { year: "2027" })
-// "2027-07-04 and 2027-12-25"
-```
-
-A ptern also offers metadata about the pattern itself. For example:
-
-```
-isoDate.maxLength()             
-// 10
-
-isoDate.minLength()             
-// 10
+```gleam
+ptern.max_length(iso_date)   // Some(10)
+ptern.min_length(iso_date)   // 10
 ```
 
 
 ## Language Support
 
 Ptern is designed to be language-independent. The pattern language and its grammar are fully defined in this document; each language binding wraps the same compiled core.
-
-### TypeScript / JavaScript
-
-```typescript
-import { ptern } from "./index.ts"
-
-const isoDate = ptern`
-  yyyy = %Digit * 4;
-  mm = ('0' '1'..'9') | ('1' '0'..'2');
-  dd = ('0' '1'..'9') | ('1'..'2' %Digit) | ('3' '0'..'1');
-  {yyyy} as year '-' {mm} as month '-' {dd} as day
-`
-
-isoDate.matchesAllOf("2026-07-04")     // true
-isoDate.matchAllOf("2026-07-04")       // { index: 0, length: 10, captures: { year: "2026", month: "07", day: "04" } }
-isoDate.maxLength()                    // 10
-```
 
 ### Gleam
 
@@ -109,15 +91,17 @@ import ptern
 
 let assert Ok(iso_date) = ptern.compile("
   yyyy = %Digit * 4;
-  mm = ('0' '1'..'9') | ('1' '0'..'2');
-  dd = ('0' '1'..'9') | ('1'..'2' %Digit) | ('3' '0'..'1');
+  mm = '0' '1'..'9' | '1' '0'..'2';
+  dd = '0' '1'..'9' | '1'..'2' %Digit | '3' '0'..'1';
   {yyyy} as year '-' {mm} as month '-' {dd} as day
 ")
 
 ptern.matches_all_of(iso_date, "2026-07-04")   // True
 ptern.match_all_of(iso_date, "2026-07-04")     // Some(MatchOccurrence(index: 0, length: 10, captures: ...))
-ptern.max_length(iso_date)              // Some(10)
+ptern.max_length(iso_date)                     // Some(10)
 ```
 
-*More language bindings are planned.*
+See `ptern-gleam/doc/user-guide.md` for the full Gleam API reference.
+
+*Additional language bindings are planned.*
 

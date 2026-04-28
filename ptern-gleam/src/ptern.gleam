@@ -74,11 +74,9 @@ pub opaque type Ptern {
     is_substitutable: Bool,
     ignore_substitution_matching: Bool,
     substitution_plan: Option(SubstitutionPlan),
-    // Fields read by the TypeScript wrapper (index.ts)
     source: String,
     flags: String,
-    capture_validator_list: List(#(String, String)),
-    // Wire format for repetition_info: list of (group_name, sub_source, captures)
+    // Each entry: (group_name, sub_source, capture_names)
     repetition_info_list: List(#(String, String, List(String))),
   )
 }
@@ -135,7 +133,6 @@ pub fn compile(source: String) -> Result(Ptern, CompileError) {
         substitution_plan: compiled.substitution_plan,
         source: src,
         flags: d_flg,
-        capture_validator_list: compiled.capture_validators,
         repetition_info_list: list.map(
           compiled.repetition_info,
           fn(ri) { #(ri.group_name, ri.sub_source, ri.captures) },
