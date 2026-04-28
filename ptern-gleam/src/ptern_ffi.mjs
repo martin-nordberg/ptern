@@ -19,7 +19,7 @@ function captures_list(m) {
   const groups = m.groups ?? {};
   return toList(
     Object.entries(groups)
-      .filter(([, v]) => typeof v === "string")
+      .filter(([k, v]) => !k.startsWith("__rep_") && typeof v === "string")
       .map(([k, v]) => [k, v]),
   );
 }

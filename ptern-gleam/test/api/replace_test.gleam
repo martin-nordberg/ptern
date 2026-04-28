@@ -1,4 +1,5 @@
 import gleam/dict
+import gleam/option.{Some}
 import gleeunit/should
 import ptern
 
@@ -291,4 +292,97 @@ pub fn array_length_mismatch_error_test() {
     dict.from_list([#("yr", ptern.ArrayReplacement(["A", "B"]))]),
   )
   |> should.equal(Error(ptern.ArrayLengthMismatch("yr", 2, 3)))
+}
+
+// ---------------------------------------------------------------------------
+// Round-trip: replace with the same values that came out of a match
+// ---------------------------------------------------------------------------
+
+// Helper: lift a captures dict into a replacements dict.
+fn as_replacements(
+  captures: dict.Dict(String, String),
+) -> dict.Dict(String, ptern.ReplacementValue) {
+  dict.map_values(captures, fn(_, v) { ptern.ScalarReplacement(v) })
+}
+
+pub fn round_trip_replace_all_of_test() {
+  let assert Ok(p) =
+    ptern.compile("%Digit * 4 as year '-' %Digit * 2 as month '-' %Digit * 2 as day")
+  let input = "2026-04-27"
+  let assert Some(m) = ptern.match_all_of(p, input)
+  ptern.replace_all_of(p, input, as_replacements(m.captures))
+  |> should.equal(Ok(input))
+}
+
+pub fn round_trip_replace_start_of_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let input = "2026 is a great year"
+  let assert Some(m) = ptern.match_start_of(p, input)
+  ptern.replace_start_of(p, input, as_replacements(m.captures))
+  |> should.equal(Ok(input))
+}
+
+pub fn round_trip_replace_end_of_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let input = "the year is 2026"
+  let assert Some(m) = ptern.match_end_of(p, input)
+  ptern.replace_end_of(p, input, as_replacements(m.captures))
+  |> should.equal(Ok(input))
+}
+
+pub fn round_trip_replace_first_in_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let input = "event in 2026, repeated in 2025"
+  let assert Some(m) = ptern.match_first_in(p, input)
+  ptern.replace_first_in(p, input, as_replacements(m.captures))
+  |> should.equal(Ok(input))
+}
+
+pub fn round_trip_replace_next_in_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  let input = "2026 and 2025"
+  let assert Some(m) = ptern.match_next_in(p, input, 7)
+  ptern.replace_next_in(p, input, 7, as_replacements(m.captures))
+  |> should.equal(Ok(input))
+}
+
+// replace_all_in round-trips only when every occurrence shares the same
+// capture values; the replacement dict is uniform across all matches.
+pub fn round_trip_replace_all_in_uniform_captures_test() {
+  let assert Ok(p) = ptern.compile("'v' %Digit as ver")
+  let input = "v1 v1 v1"
+  ptern.replace_all_in(
+    p,
+    input,
+    dict.from_list([#("ver", ptern.ScalarReplacement("1"))]),
+  )
+  |> should.equal(Ok(input))
+}
+
+// replace_all_in does NOT round-trip when occurrences have different values;
+// the last match's captured value is used as the replacement dict here.
+pub fn round_trip_replace_all_in_non_uniform_breaks_test() {
+  let assert Ok(p) = ptern.compile("'v' %Digit as ver")
+  let input = "v1 v2 v3"
+  let assert [_, _, last] = ptern.match_all_in(p, input)
+  // Using only the last match's value replaces all occurrences with "3".
+  ptern.replace_all_in(p, input, as_replacements(last.captures))
+  |> should.equal(Ok("v3 v3 v3"))
+}
+
+// Repetition captures: match returns only the last iteration's value (how JS
+// named groups work — overwritten each pass). Replacing with that scalar
+// broadcasts the last value to ALL iterations rather than restoring each one.
+pub fn round_trip_repetition_capture_broadcasts_last_value_test() {
+  let assert Ok(p) =
+    ptern.compile(
+      "!replacements-ignore-matching = true\n(%Digit * 4 as yr) * 3",
+    )
+  let input = "202420252026"
+  let assert Some(occ) = ptern.match_first_in(p, input)
+  // The match API returns only the last iteration's value.
+  dict.get(occ.captures, "yr") |> should.equal(Ok("2026"))
+  // Replacing with that scalar broadcasts "2026" to all three slots.
+  ptern.replace_first_in(p, input, as_replacements(occ.captures))
+  |> should.equal(Ok("202620262026"))
 }

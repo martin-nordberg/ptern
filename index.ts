@@ -237,7 +237,7 @@ class PternImpl implements Ptern {
     const groups = m.groups ?? {};
     const captures: MatchResult = {};
     for (const [k, v] of Object.entries(groups)) {
-      if (typeof v === "string") captures[k] = v;
+      if (!k.startsWith("__rep_") && typeof v === "string") captures[k] = v;
     }
     return { index: m.index, length: m[0].length, captures };
   }
