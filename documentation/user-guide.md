@@ -439,7 +439,7 @@ keyword.matchesAllOf("WHERE")    // true
 
 ### `!multiline = true`
 
-Makes `@line-start` and `@line-end` match at the boundary of each line instead of the whole string. The annotation is also enabled automatically whenever `@line-start` or `@line-end` appears in the pattern (see Position Assertions below).
+Makes `@line-start` and `@line-end` match at the boundary of each line instead of the whole string. It also causes `matchesAllOf`, `matchesStartOf`, and `matchesEndOf` to operate at line boundaries rather than string boundaries: for example, `matchesAllOf` returns `true` if any complete line in the input is a full match. The annotation is also enabled automatically whenever `@line-start` or `@line-end` appears in the pattern (see Position Assertions below).
 
 ### `!replacements-ignore-matching = true`
 

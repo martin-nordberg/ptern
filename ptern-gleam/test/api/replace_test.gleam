@@ -294,6 +294,21 @@ pub fn array_length_mismatch_error_test() {
   |> should.equal(Error(ptern.ArrayLengthMismatch("yr", 2, 3)))
 }
 
+pub fn duplicate_repetition_capture_error_test() {
+  // The same capture name appears in two separate repetition groups.
+  // ArrayReplacement is ambiguous in that case — the validator rejects it.
+  let assert Ok(p) =
+    ptern.compile(
+      "!replacements-ignore-matching = true\n(%Digit as n) * 2 (%Alpha as n) * 3",
+    )
+  ptern.replace_first_in(
+    p,
+    "12abc",
+    dict.from_list([#("n", ptern.ArrayReplacement(["x", "y"]))]),
+  )
+  |> should.equal(Error(ptern.DuplicateRepetitionCapture("n")))
+}
+
 // ---------------------------------------------------------------------------
 // Round-trip: replace with the same values that came out of a match
 // ---------------------------------------------------------------------------

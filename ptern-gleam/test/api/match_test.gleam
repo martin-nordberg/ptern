@@ -635,6 +635,44 @@ pub fn multiline_annotation_alone_enables_m_flag_test() {
   ptern.max_length(p) |> should.equal(option.None)
 }
 
+// !multiline = true changes the behaviour of matches_all_of / matches_start_of /
+// matches_end_of because those operations wrap the pattern with ^ and $ anchors.
+// With the m flag those anchors match at line boundaries, not just string boundaries.
+
+pub fn multiline_matches_all_of_matches_complete_line_test() {
+  // Without !multiline, "hello\nworld\n123" is not fully alpha → false.
+  let assert Ok(plain) = ptern.compile("%Alpha * 1..?")
+  ptern.matches_all_of(plain, "hello\nworld\n123") |> should.be_false
+  // With !multiline = true, ^ and $ match per-line so "hello" and "world" satisfy
+  // the anchored pattern → true.
+  let assert Ok(p) = ptern.compile("!multiline = true\n%Alpha * 1..?")
+  ptern.matches_all_of(p, "hello\nworld\n123") |> should.be_true
+  // A string with no all-alpha line still returns false.
+  ptern.matches_all_of(p, "hello world\n123 go") |> should.be_false
+}
+
+pub fn multiline_matches_start_of_matches_any_line_start_test() {
+  // Without !multiline, "123\nhello world" does not start with alpha → false.
+  let assert Ok(plain) = ptern.compile("%Alpha * 1..?")
+  ptern.matches_start_of(plain, "123\nhello world") |> should.be_false
+  // With !multiline = true, "hello" appears at the start of line 2 → true.
+  let assert Ok(p) = ptern.compile("!multiline = true\n%Alpha * 1..?")
+  ptern.matches_start_of(p, "123\nhello world") |> should.be_true
+  // String that starts with alpha still matches in both modes.
+  ptern.matches_start_of(p, "hello world") |> should.be_true
+}
+
+pub fn multiline_matches_end_of_matches_any_line_end_test() {
+  // Without !multiline, "hello world\n123" does not end with alpha → false.
+  let assert Ok(plain) = ptern.compile("%Alpha * 1..?")
+  ptern.matches_end_of(plain, "hello world\n123") |> should.be_false
+  // With !multiline = true, "world" ends line 1 → true.
+  let assert Ok(p) = ptern.compile("!multiline = true\n%Alpha * 1..?")
+  ptern.matches_end_of(p, "hello world\n123") |> should.be_true
+  // String that ends with alpha still matches in both modes.
+  ptern.matches_end_of(p, "say hello") |> should.be_true
+}
+
 pub fn position_assertion_length_is_zero_test() {
   let assert Ok(p) = ptern.compile("@word-start %Digit * 4 @word-end")
   ptern.min_length(p) |> should.equal(4)

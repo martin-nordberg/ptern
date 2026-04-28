@@ -324,7 +324,7 @@ Annotations configure compilation options for the entire pattern. They must all 
 | Annotation                         | Values          | Default | Meaning |
 |:-----------------------------------|:---------------:|:-------:|:--------|
 | `!case-insensitive`                | `true`/`false`  | `false` | Causes literal strings and character ranges to match both uppercase and lowercase characters. Compiles to the `i` regex flag. |
-| `!multiline`                       | `true`/`false`  | `false` | Enables multiline mode: `@line-start` and `@line-end` match at the start and end of each line rather than the whole string. Also enabled automatically when `@line-start` or `@line-end` appears anywhere in the pattern. Compiles to the `m` regex flag. |
+| `!multiline`                       | `true`/`false`  | `false` | Enables multiline mode: `@line-start` and `@line-end` match at the start and end of each line rather than the whole string. Also causes `matchesAllOf`, `matchesStartOf`, and `matchesEndOf` to operate at line boundaries rather than string boundaries (see §9.1). Also enabled automatically when `@line-start` or `@line-end` appears anywhere in the pattern. Compiles to the `m` regex flag. |
 | `!replacements-ignore-matching`    | `true`/`false`  | `false` | When `true`, replacement values are not validated against their capture subpatterns. See §10. Has no effect on `substitute()`. |
 | `!substitutable`                   | `true`/`false`  | `false` | Declares that the pattern is substitutable (§11). Triggers a compile-time structural check. Required before `substitute()` may be called at runtime. |
 | `!substitutions-ignore-matching`   | `true`/`false`  | `false` | When `true`, capture values passed to `substitute()` are not validated against their subpatterns. See §11. Has no effect on replacement operations. Setting this annotation without also setting `!substitutable = true` is a compile-time error. |
@@ -477,6 +477,8 @@ A successfully compiled ptern supports the following operations. In all cases th
 | `matchesStartOf(s)`| The pattern matches a prefix of `s` starting at index 0    |
 | `matchesEndOf(s)`  | The pattern matches a suffix of `s` ending at `len(s)`     |
 | `matchesIn(s)`     | The pattern matches some substring of `s`                   |
+
+When `!multiline = true` is set (or auto-enabled by `@line-start`/`@line-end`), `matchesAllOf`, `matchesStartOf`, and `matchesEndOf` operate at **line** boundaries rather than string boundaries: `matchesAllOf` returns `true` if any complete line in `s` is a full match, `matchesStartOf` returns `true` if a match begins at the start of any line, and `matchesEndOf` returns `true` if a match ends at the end of any line. `matchesIn` is unaffected.
 
 ### 9.2 Match Occurrences
 
@@ -689,7 +691,7 @@ When the same capture name appears in both a non-repeated and a repeated positio
 |:----------------------------------------|:------------------------------------------------------------------------|
 | `NotSubstitutable`                      | `substitute()` called on a ptern without `!substitutable = true`        |
 | `MissingCapture(name)`                  | A required capture is absent and its expression is not substitutable    |
-| `InvalidSubstitutionValue(name, value)` | `value` does not match the sub-pattern for `name`; only when `!substitutions-ignore-matching = false` |
+| `CaptureMismatch(name, value)`          | `value` does not match the sub-pattern for `name`; only when `!substitutions-ignore-matching = false` |
 | `WrongCaptureType(name)`                | `string[]` provided where `string` is required, or vice versa           |
 | `ArrayLengthError(name, length, min, max)` | Array length outside the repetition bounds `[n, m]`, or two arrays within the same repetition differ in length |
 | `NoMatchingBranch`                      | All branches of an alternation fail                                     |

@@ -19,9 +19,6 @@ pub type SemanticError {
   /// A capture name is the same as a definition name.
   CaptureDefinitionConflict(name: String)
 
-  /// A named capture (`as name`) appears inside a repeated sub-pattern.
-  CaptureInRepetition(name: String)
-
   /// A `..` range endpoint is not a single-character literal.
   /// `content` is the raw literal content that failed the check.
   InvalidRangeEndpoint(content: String)
