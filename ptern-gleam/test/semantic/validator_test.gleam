@@ -2,10 +2,11 @@ import gleeunit/should
 import lexer/lexer
 import parser/parser
 import semantic/error.{
-  BoundedRepetitionNeedsCapture, DuplicateAnnotation, EmptyLiteral,
-  InvalidEscapeSequence, InvalidExclusionOperand, InvalidRangeEndpoint,
-  InvertedRange, InvertedRepetitionBounds, NotSubstitutableBody,
-  SubstitutionsIgnoreMatchingWithoutSubstitutable, UnknownAnnotation,
+  BoundedRepetitionNeedsCapture, DuplicateAnnotation, EmptyCharacterSet,
+  EmptyLiteral, InvalidEscapeSequence, InvalidExclusionOperand,
+  InvalidRangeEndpoint, InvertedRange, InvertedRepetitionBounds,
+  NotSubstitutableBody, SubstitutionsIgnoreMatchingWithoutSubstitutable,
+  UnknownAnnotation,
 }
 import semantic/validator
 
@@ -161,6 +162,26 @@ pub fn equal_repetition_bounds_valid_test() {
 // ---------------------------------------------------------------------------
 // Exclusion operand errors
 // ---------------------------------------------------------------------------
+
+pub fn empty_character_set_charclass_test() {
+  validate("%Digit excluding %Digit")
+  |> should.equal([EmptyCharacterSet])
+}
+
+pub fn empty_character_set_single_char_test() {
+  validate("'x' excluding 'x'")
+  |> should.equal([EmptyCharacterSet])
+}
+
+pub fn empty_character_set_range_test() {
+  validate("'a'..'z' excluding 'a'..'z'")
+  |> should.equal([EmptyCharacterSet])
+}
+
+pub fn non_empty_exclusion_different_operands_valid_test() {
+  validate("%Digit excluding '0'")
+  |> should.equal([])
+}
 
 pub fn invalid_exclusion_group_operand_test() {
   let errs = validate("'a'..'z' excluding ('a')")

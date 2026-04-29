@@ -337,6 +337,8 @@ The following constraints are checked after parsing. A ptern that violates any c
 
 ### 7.1 String Literal Constraints
 
+**Empty literal** — An empty string literal `''` or `""` is an error. Every literal must contain at least one character.
+
 **Invalid escape sequence** — A string literal containing `\X` where `X` is not one of the recognised escape characters from §3.3 is an error.
 
 **Invalid Unicode escape** — `\uXXXX` must form a valid Unicode scalar value (U+0000–U+D7FF or U+E000–U+10FFFF expressed as exactly four hex digits).
@@ -350,6 +352,10 @@ The following constraints are checked after parsing. A ptern that violates any c
 ### 7.3 Exclusion Constraints
 
 **Single-character operands** — Both sides of `excluding` must match exactly one character. A group `(...)` or an interpolation `{...}` on either side of `excluding` is an error.
+
+**Non-empty result** — When both operands are structurally identical (e.g. `%Digit excluding %Digit` or `'x' excluding 'x'` or `'a'..'z' excluding 'a'..'z'`), the resulting character class can never match any character and is a compile-time error.
+
+Note: ptern's static analysis is structural — it only catches cases where the two sides are textually the same expression. Semantically equivalent but textually distinct pairs such as `%Digit excluding '0'..'9'` are not detected as empty.
 
 ### 7.4 Repetition Bound Constraints
 

@@ -104,6 +104,8 @@ ptern.compile("'hello'")    // same as
 ptern.compile("\"hello\"")
 ```
 
+An empty literal `''` or `""` is a compile-time error — every literal must contain at least one character.
+
 Inside a literal, these escape sequences are recognised:
 
 | Escape | Meaning |
@@ -280,7 +282,7 @@ let assert Ok(non_zero_digit) = ptern.compile("%Digit excluding '0'")
 let assert Ok(octal_digit)    = ptern.compile("%Digit excluding '8'..'9'")
 ```
 
-Both sides of `excluding` must match exactly one character.
+Both sides of `excluding` must match exactly one character. When both sides are the same expression — `%Digit excluding %Digit`, `'x' excluding 'x'`, or `'a'..'z' excluding 'a'..'z'` — the result would be an empty character class, so the compiler rejects the pattern. Semantically equivalent but textually distinct pairs (e.g. `%Digit excluding '0'..'9'`) are not caught at compile time.
 
 A practical use: matching the contents of a quoted string without letting a closing quote slip through:
 

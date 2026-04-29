@@ -63,4 +63,8 @@ pub type SemanticError {
 
   /// A string literal `''` or `""` contains no characters.
   EmptyLiteral
+
+  /// Both sides of `excluding` are structurally identical (e.g. `%Digit excluding %Digit`),
+  /// so the resulting character class is always empty.
+  EmptyCharacterSet
 }

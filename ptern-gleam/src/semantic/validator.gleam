@@ -10,9 +10,9 @@ import parser/ast.{
 }
 import semantic/error.{
   type SemanticError, BoundedRepetitionNeedsCapture, DuplicateAnnotation,
-  EmptyLiteral, InvalidEscapeSequence, InvalidExclusionOperand,
-  InvalidRangeEndpoint, InvertedRange, InvertedRepetitionBounds,
-  NotSubstitutableBody, PositionAssertionInRepetition,
+  EmptyCharacterSet, EmptyLiteral, InvalidEscapeSequence,
+  InvalidExclusionOperand, InvalidRangeEndpoint, InvertedRange,
+  InvertedRepetitionBounds, NotSubstitutableBody, PositionAssertionInRepetition,
   SubstitutionsIgnoreMatchingWithoutSubstitutable, UnknownAnnotation,
   UnknownPositionAssertion,
 }
@@ -207,8 +207,12 @@ fn validate_exclusion(
       let item_errs =
         validate_range_item(excl_item, inside_rep, is_subst, def_bodies)
       let set_errs = case is_char_set(excl.base) && is_char_set(excl_item) {
-        True -> []
         False -> [InvalidExclusionOperand]
+        True ->
+          case excl.base == excl_item {
+            True -> [EmptyCharacterSet]
+            False -> []
+          }
       }
       list.flatten([base_errs, item_errs, set_errs])
     }
