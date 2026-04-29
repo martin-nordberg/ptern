@@ -1,4 +1,4 @@
-import bounds
+import semantic/bounds
 import codegen/codegen
 import codegen/substitution.{
   type SubstitutionPlan,
@@ -20,7 +20,7 @@ import lexer/lexer
 import lexer/token
 import parser/ast
 import parser/parser
-import regex
+import regex_js/regex
 import semantic/error as semantic_error
 import semantic/resolver
 import semantic/validator

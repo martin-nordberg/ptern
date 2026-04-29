@@ -1,6 +1,6 @@
-import { toList } from "../prelude.mjs";
-import { Ok, Error } from "../prelude.mjs";
-import { None, Some } from "../gleam_stdlib/gleam/option.mjs";
+import { toList } from "../../prelude.mjs";
+import { Ok, Error } from "../../prelude.mjs";
+import { None, Some } from "../../gleam_stdlib/gleam/option.mjs";
 
 export function make_regex(source, flags) {
   return new RegExp(source, flags);
