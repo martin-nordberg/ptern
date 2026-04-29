@@ -413,3 +413,40 @@ pub fn substitute_unbounded_rep_below_min_error_test() {
   )
   |> should.equal(Error(ptern.ArrayLengthError("d", 2, 3, None)))
 }
+
+// ---------------------------------------------------------------------------
+// substitute — empty string values
+// ---------------------------------------------------------------------------
+
+pub fn substitute_empty_scalar_validates_mismatch_test() {
+  let assert Ok(p) = ptern.compile("!substitutable = true\n%Digit * 4 as year")
+  ptern.substitute(
+    p,
+    dict.from_list([#("year", ptern.ScalarReplacement(""))]),
+  )
+  |> should.equal(Error(ptern.CaptureMismatch("year", "")))
+}
+
+pub fn substitute_empty_scalar_ignore_matching_test() {
+  let assert Ok(p) =
+    ptern.compile(
+      "!substitutable = true\n!substitutions-ignore-matching = true\n'[' %Digit as d ']'",
+    )
+  ptern.substitute(
+    p,
+    dict.from_list([#("d", ptern.ScalarReplacement(""))]),
+  )
+  |> should.equal(Ok("[]"))
+}
+
+pub fn substitute_empty_array_element_ignore_matching_test() {
+  let assert Ok(p) =
+    ptern.compile(
+      "!substitutable = true\n!substitutions-ignore-matching = true\n(%Digit as d) * 3",
+    )
+  ptern.substitute(
+    p,
+    dict.from_list([#("d", ptern.ArrayReplacement(["1", "", "3"]))]),
+  )
+  |> should.equal(Ok("13"))
+}

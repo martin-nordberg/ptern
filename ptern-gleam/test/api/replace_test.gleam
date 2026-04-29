@@ -310,6 +310,53 @@ pub fn duplicate_repetition_capture_error_test() {
 }
 
 // ---------------------------------------------------------------------------
+// Empty string replacement values
+// ---------------------------------------------------------------------------
+
+pub fn replace_scalar_empty_deletes_capture_test() {
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
+  ptern.replace_first_in(
+    p,
+    "event 2026",
+    dict.from_list([#("year", ptern.ScalarReplacement(""))]),
+  )
+  |> should.equal(Ok("event "))
+}
+
+pub fn replace_all_in_scalar_empty_deletes_all_test() {
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
+  ptern.replace_all_in(
+    p,
+    "2026 and 2025",
+    dict.from_list([#("year", ptern.ScalarReplacement(""))]),
+  )
+  |> should.equal(Ok(" and "))
+}
+
+pub fn replace_array_empty_element_deletes_iteration_test() {
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n(%Alpha as c) * 3")
+  ptern.replace_first_in(
+    p,
+    "abc",
+    dict.from_list([#("c", ptern.ArrayReplacement(["", "x", ""]))]),
+  )
+  |> should.equal(Ok("x"))
+}
+
+pub fn replace_scalar_empty_validates_invalid_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  ptern.replace_first_in(
+    p,
+    "event 2026",
+    dict.from_list([#("year", ptern.ScalarReplacement(""))]),
+  )
+  |> should.equal(Error(ptern.InvalidReplacementValue("year", "")))
+}
+
+// ---------------------------------------------------------------------------
 // Round-trip: replace with the same values that came out of a match
 // ---------------------------------------------------------------------------
 

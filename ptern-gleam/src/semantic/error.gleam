@@ -60,4 +60,7 @@ pub type SemanticError {
   /// A bounded repetition `E * n..m` inside a substitutable context contains
   /// no named capture, so the iteration count cannot be determined at runtime.
   BoundedRepetitionNeedsCapture
+
+  /// A string literal `''` or `""` contains no characters.
+  EmptyLiteral
 }

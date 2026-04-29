@@ -10,10 +10,11 @@ import parser/ast.{
 }
 import semantic/error.{
   type SemanticError, BoundedRepetitionNeedsCapture, DuplicateAnnotation,
-  InvalidEscapeSequence, InvalidExclusionOperand, InvalidRangeEndpoint,
-  InvertedRange, InvertedRepetitionBounds, NotSubstitutableBody,
-  PositionAssertionInRepetition, SubstitutionsIgnoreMatchingWithoutSubstitutable,
-  UnknownAnnotation, UnknownPositionAssertion,
+  EmptyLiteral, InvalidEscapeSequence, InvalidExclusionOperand,
+  InvalidRangeEndpoint, InvertedRange, InvertedRepetitionBounds,
+  NotSubstitutableBody, PositionAssertionInRepetition,
+  SubstitutionsIgnoreMatchingWithoutSubstitutable, UnknownAnnotation,
+  UnknownPositionAssertion,
 }
 
 /// Run all constraint checks on a parsed Ptern, returning every error found.
@@ -277,7 +278,11 @@ fn validate_atom(
   def_bodies: Dict(String, Expression),
 ) -> List(SemanticError) {
   case atom {
-    Literal(c) -> validate_literal_escapes(c)
+    Literal(c) ->
+      case c {
+        "" -> [EmptyLiteral]
+        _ -> validate_literal_escapes(c)
+      }
     CharClass(_) -> []
     Interpolation(_) -> []
     Group(expr) -> validate_expression(expr, inside_rep, is_subst, def_bodies)

@@ -2,7 +2,7 @@ import gleeunit/should
 import lexer/lexer
 import parser/parser
 import semantic/error.{
-  BoundedRepetitionNeedsCapture, DuplicateAnnotation,
+  BoundedRepetitionNeedsCapture, DuplicateAnnotation, EmptyLiteral,
   InvalidEscapeSequence, InvalidExclusionOperand, InvalidRangeEndpoint,
   InvertedRange, InvertedRepetitionBounds, NotSubstitutableBody,
   SubstitutionsIgnoreMatchingWithoutSubstitutable, UnknownAnnotation,
@@ -24,6 +24,25 @@ fn has_error(errs: List(error.SemanticError), target: error.SemanticError) -> Bo
     [] -> False
     [e, ..rest] -> e == target || has_error(rest, target)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Empty literal errors
+// ---------------------------------------------------------------------------
+
+pub fn empty_single_quoted_literal_test() {
+  validate("''")
+  |> should.equal([EmptyLiteral])
+}
+
+pub fn empty_double_quoted_literal_test() {
+  validate("\"\"")
+  |> should.equal([EmptyLiteral])
+}
+
+pub fn empty_literal_in_sequence_test() {
+  let errs = validate("'a' '' 'b'")
+  errs |> has_error(EmptyLiteral) |> should.be_true
 }
 
 // ---------------------------------------------------------------------------
