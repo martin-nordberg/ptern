@@ -75,7 +75,7 @@ pub fn substitutable_compiles_ok_iso_date_test() {
 
 pub fn substitutable_compiles_ok_csv_test() {
   ptern.compile(
-    "!substitutable = true\nfield = %Any * 1..100;\n{field} as col (',' {field} as col) * 0..20",
+    "!substitutable = true\nfield = %Any excluding ',' * 1..100;\n{field} as col (',' {field} as col) * 0..20",
   )
   |> should.be_ok
 }
@@ -249,7 +249,7 @@ pub fn substitute_fixed_rep_array_test() {
 pub fn substitute_bounded_rep_array_test() {
   let assert Ok(p) =
     ptern.compile(
-      "!substitutable = true\nfield = %Any * 1..20;\n{field} as col (',' {field} as col) * 0..5",
+      "!substitutable = true\nfield = %Any excluding ',' * 1..20;\n{field} as col (',' {field} as col) * 0..5",
     )
   ptern.substitute(
     p,

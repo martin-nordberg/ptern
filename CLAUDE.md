@@ -27,19 +27,22 @@ gleam add <package>  # Add a dependency
 
 The Gleam project targets JavaScript only (`target = "javascript"` in `ptern-gleam/gleam.toml`) and runs on Bun.
 
+**Running individual tests:** gleeunit does not support test filtering. To focus on one test module during development, temporarily isolate it by commenting out the other `pub fn main()` registrations, or just let `gleam test` run everything (it is fast). Each test function must be a public function whose name ends with `_test`.
+
 ## Project Structure
 
 - `ptern-gleam/` — Gleam implementation (self-contained Gleam project)
   - `src/ptern.gleam` — library entry point; exposes `compile/1` and all public types
-  - `src/ptern_ffi.mjs` — JavaScript FFI for regex execution and replacement patching
-  - `src/regex.gleam` — Gleam wrappers around the FFI regex functions
-  - `src/bounds.gleam` — min/max length computation
+  - `src/regex_js/ptern_ffi.mjs` — JavaScript FFI for regex execution and replacement patching
+  - `src/regex_js/regex.gleam` — Gleam wrappers around the FFI regex functions
   - `src/lexer/` — tokeniser
   - `src/parser/` — parser producing an AST (`parser/ast.gleam`)
-  - `src/semantic/` — `validator.gleam` (constraint checks), `resolver.gleam` (name resolution), `error.gleam` (error types)
+  - `src/semantic/` — `validator.gleam` (constraint checks), `resolver.gleam` (name resolution), `error.gleam` (error types), `bounds.gleam` (min/max length computation)
   - `src/codegen/` — `codegen.gleam` (orchestration), `regex.gleam` (regex emission with `RepetitionInfo`), `substitution.gleam` (substitution plan builder)
   - `test/ptern_test.gleam` — gleeunit entry point (`main()` only)
   - `test/api/` — API-level tests: `match_test.gleam`, `replace_test.gleam`, `substitute_test.gleam`, `examples_test.gleam`
+  - `test/lexer/` — `lexer_test.gleam`
+  - `test/parser/` — `parser_test.gleam`
   - `test/semantic/` — `validator_test.gleam`, `resolver_test.gleam`
   - `test/codegen/` — `codegen_test.gleam`
   - `gleam.toml` — Gleam project manifest
@@ -71,6 +74,16 @@ Full specification: `documentation/ptern-specification.md`. Key constructs:
 Operator precedence (tightest to loosest): `()`, `{}`, `..`, `excluding`, `*`, `as`, sequence (space), `|`
 
 ## Key Implementation Details
+
+**Compile pipeline** (`compile/1` in `src/ptern.gleam`):
+1. **Lex** — `lexer/lexer.gleam` produces a token stream
+2. **Parse** — `parser/parser.gleam` produces a `ParsedPtern` AST
+3. **Validate** — `semantic/validator.gleam` checks structural constraints (literal escapes, range endpoints, repetition bounds, annotation names, substitutability, etc.)
+4. **Resolve** — `semantic/resolver.gleam` checks name-resolution constraints (undefined refs, circular definitions, capture/definition conflicts); `DuplicateCapture` errors are intentionally filtered out after this step
+5. **Codegen** — `codegen/codegen.gleam` emits the regex source string, flags, `RepetitionInfo`, capture validators, and substitution plan
+6. **Bounds** — `semantic/bounds.gleam` computes `min_len` / `max_len` from the AST
+
+New semantic passes (e.g., a backtracking checker) belong between steps 4 and 5, take a `ParsedPtern`, and return `List(SemanticError)`.
 
 **Replacement** works by patching per-capture index spans (from the `d` flag) directly into the match text. Captures inside repetitions use a two-pass approach: the main regex wraps the repetition in a synthetic `__rep_N` named group; a sub-regex is then run within that span to extract per-iteration spans. The `__rep_N` names are internal and are filtered out of all user-facing match results.
 

@@ -21,6 +21,7 @@ import lexer/token
 import parser/ast
 import parser/parser
 import regex_js/regex
+import semantic/backtracking
 import semantic/error as semantic_error
 import semantic/resolver
 import semantic/validator
@@ -89,7 +90,11 @@ pub fn compile(source: String) -> Result(Ptern, CompileError) {
   use tokens <- result.try(lexer.lex(source) |> result.map_error(LexError))
   use parsed <- result.try(parser.parse(tokens) |> result.map_error(ParseError))
   let all_errors =
-    list.append(validator.validate(parsed), resolver.resolve(parsed))
+    list.flatten([
+      validator.validate(parsed),
+      resolver.resolve(parsed),
+      backtracking.check(parsed),
+    ])
   // Duplicate capture names are intentional in all patterns: the same name
   // in multiple positions means "apply the same replacement value everywhere"
   // (or, when !substitutable = true, consume an array sequentially).

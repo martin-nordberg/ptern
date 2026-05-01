@@ -511,6 +511,66 @@ ptern.replace_first_in(
 // Ok("YYYY")
 ```
 
+### `!allow-backtracking = true`
+
+By default, the compiler rejects patterns that could cause catastrophic backtracking in the JavaScript regex engine. Three checks are run on any pattern that contains variable-count repetitions (`* n..m` with `n < m`, or `* n..?`); exact-count repetitions (`* n`) are exempt.
+
+**Overlapping alternation branches in a repetition** — if two branches of an alternation share characters at the boundary between iterations, `AmbiguousRepetitionAdjacency` is reported:
+
+```gleam
+// Error: 'a' and 'ab' both start with 'a' — engine cannot tell them apart
+ptern.compile("('a' | 'ab') * 1..?")
+
+// OK: %Alpha and '_' are disjoint
+ptern.compile("(%Alpha | '_') * 1..?")
+
+// OK: %Alpha and %Digit are disjoint
+ptern.compile("(%Alpha | %Digit) * 1..?")
+```
+
+**Variable-length body that overlaps itself** — if the body of a variable-count repetition is variable-length and its last and first character sets overlap, `AmbiguousRepetitionBody` is reported. A fixed-length body is never flagged:
+
+```gleam
+// Error: inner repetition is variable-length; %Alpha∩%Alpha ≠ ∅
+ptern.compile("(%Alpha * 1..?) * 1..?")
+
+// OK: last=%Digit, first='x' — disjoint
+ptern.compile("('x' %Digit * 1..?) * 1..?")
+
+// OK: body %Digit is fixed length 1
+ptern.compile("(%Digit) * 1..?")
+```
+
+**Adjacent unbounded repetitions** — two directly adjacent unbounded repetitions with overlapping character sets produce `AmbiguousAdjacentRepetition`. A bounded repetition (`* n..m`) on either side avoids the check:
+
+```gleam
+// Error: both unbounded, %Digit∩%Digit ≠ ∅
+ptern.compile("%Digit * 1..? %Digit * 1..?")
+
+// OK: literal '-' separates them
+ptern.compile("%Digit * 1..? '-' %Digit * 1..?")
+
+// OK: first repetition is bounded (* 1..5)
+ptern.compile("%Alpha * 1..5 %Alpha * 1..?")
+```
+
+When a pattern is structurally safe but the static analysis cannot prove it, set `!allow-backtracking = true` to opt out. A real example is a double-quoted string that allows escaped quotes:
+
+```gleam
+let assert Ok(dq_string) = ptern.compile(
+  "!allow-backtracking = true
+  char = %Any excluding '\"';
+  '\"' ({char} | '\\\"') * 0..1000 '\"'",
+)
+
+ptern.matches_all_of(dq_string, "\"hello\"")           // True
+ptern.matches_all_of(dq_string, "\"say \\\"hi\\\"\"")  // True — escaped inner quotes
+```
+
+The body `({char} | '\\\"')` has branches of different lengths: `{char}` matches one character, and `'\\\"'` matches two (`\` then `"`). This makes the body variable-length, and `AmbiguousRepetitionBody` fires because the last character of one iteration can be `"` (from `'\\\"'`), which overlaps with the first character of the next. In practice the pattern is safe — the outer `'"'` terminates the string and cannot be confused with the `"` inside `'\\\"'` — but the static check cannot see that structural guarantee.
+
+Note that many patterns that look like they need `!allow-backtracking` can instead be fixed by tightening the character sets. A CSV field defined as `%Any * 1..100` triggers `AmbiguousRepetitionBody` (last char `%Any` overlaps first char `','`), but rewriting it as `%Any excluding ',' * 1..100` removes the overlap entirely and is also more semantically correct.
+
 ---
 
 ## Position Assertions
@@ -705,7 +765,7 @@ When a named capture appears inside a repeated sub-pattern, you can provide a `L
 ```gleam
 let assert Ok(csv) = ptern.compile(
   "!replacements-ignore-matching = true
-  %Any * 1..100 as col (',' %Any * 1..100 as col) * 0..20",
+  %Any excluding ',' * 1..100 as col (',' %Any excluding ',' * 1..100 as col) * 0..20",
 )
 
 ptern.replace_first_in(
@@ -827,7 +887,7 @@ An array of values drives the iteration count for a bounded repetition:
 ```gleam
 let assert Ok(csv) = ptern.compile(
   "!substitutable = true
-  field = %Any * 1..100;
+  field = %Any excluding ',' * 1..100;
   {field} as col (',' {field} as col) * 0..20",
 )
 
@@ -940,6 +1000,7 @@ Short names (`%L`, `%N`, …) and long PascalCase aliases (`%Letter`, `%Number`,
 
 | Annotation                         | Default | Meaning |
 |:-----------------------------------|:-------:|:--------|
+| `!allow-backtracking = true`       | `false` | Suppress all compile-time backtracking safety checks (§7.12 of the spec) |
 | `!case-insensitive = true`         | `false` | Literals and ranges match both cases |
 | `!multiline = true`                | `false` | `@line-start`/`@line-end` match per-line (also set automatically by those assertions) |
 | `!replacements-ignore-matching`    | `false` | Skip validation of replacement values |

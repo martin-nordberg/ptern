@@ -323,6 +323,7 @@ Annotations configure compilation options for the entire pattern. They must all 
 
 | Annotation                         | Values          | Default | Meaning |
 |:-----------------------------------|:---------------:|:-------:|:--------|
+| `!allow-backtracking`              | `true`/`false`  | `false` | When `true`, suppresses all compile-time backtracking safety checks (§7.12). Use only when the pattern is known to be safe despite the conservative static analysis. |
 | `!case-insensitive`                | `true`/`false`  | `false` | Causes literal strings and character ranges to match both uppercase and lowercase characters. Compiles to the `i` regex flag. |
 | `!multiline`                       | `true`/`false`  | `false` | Enables multiline mode: `@line-start` and `@line-end` match at the start and end of each line rather than the whole string. Also causes `matchesAllOf`, `matchesStartOf`, and `matchesEndOf` to operate at line boundaries rather than string boundaries (see §9.1). Also enabled automatically when `@line-start` or `@line-end` appears anywhere in the pattern. Compiles to the `m` regex flag. |
 | `!replacements-ignore-matching`    | `true`/`false`  | `false` | When `true`, replacement values are not validated against their capture subpatterns. See §10. Has no effect on `substitute()`. |
@@ -414,6 +415,50 @@ The recognised position assertion names are:
 ### 7.11 Substitutability Constraints
 
 When `!substitutable = true` is set, the compiler verifies that the body expression is *substitutable* according to the rules in §11.2. If the body fails the check, the ptern does not compile.
+
+### 7.12 Backtracking Safety Constraints
+
+To prevent catastrophic backtracking (ReDoS) in the compiled JavaScript regex, the compiler runs three conservative static checks on any pattern that contains variable-count repetitions. A repetition with an exact count (`E * n`) is exempt from all three checks; only `E * n..m` with `n < m` and `E * n..?` are examined. Set `!allow-backtracking = true` to suppress all three checks globally when the pattern is known to be safe.
+
+#### Ambiguous branch adjacency
+
+**Error:** `AmbiguousRepetitionAdjacency(branch_a, branch_b)`
+
+Inside a variable-count repetition whose body is an alternation — `(B₁ | B₂ | … | Bₙ) * k..m` — if any two branches `Bᵢ` and `Bⱼ` have overlapping character sets at the boundary between one iteration and the next (the last-character set of `Bᵢ` intersects the first-character set of `Bⱼ`, or vice versa), the engine may re-split a previously consumed prefix across iterations.
+
+```
+('a' | 'ab') * 1..?       ← error: 'a' ends with 'a'; 'ab' starts with 'a'
+(%Alpha | %Digit) * 1..?  ← ok: no ASCII letter is also a digit
+(%Alpha | '_') * 1..?     ← ok: '_' is not an ASCII letter
+(%Digit | %Digit) * 1..?  ← error: both branches share the same character set
+```
+
+#### Ambiguous repetition body
+
+**Error:** `AmbiguousRepetitionBody`
+
+In a variable-count repetition `E * k..m`, if `E` is **variable-length** and the last-character set of `E` overlaps the first-character set of `E`, the engine cannot unambiguously determine where one iteration ends and the next begins.
+
+A body is variable-length when different matches can have different lengths (e.g. `%Alpha * 1..?`). A body of fixed length — where every match is exactly the same number of characters (e.g. `%Alpha`, `%Digit * 3`) — is never flagged by this check, regardless of its character sets.
+
+```
+(%Alpha * 1..?) * 1..?      ← error: body is variable-length; last=%Alpha, first=%Alpha
+('x' %Digit * 1..?) * 1..? ← ok: last=%Digit, first='x' — disjoint
+(%Digit) * 1..?             ← ok: body is fixed length 1
+```
+
+#### Ambiguous adjacent repetitions
+
+**Error:** `AmbiguousAdjacentRepetition`
+
+Two directly adjacent unbounded repetitions `E₁ * a..?` `E₂ * b..?` in a sequence, where the last-character set of `E₁` overlaps the first-character set of `E₂`, leave the engine unable to determine where the first repetition ends and the second begins. This check applies only when **both** repetitions are unbounded (`n..?`); a bounded (`n..m`) repetition on either side is not flagged.
+
+```
+%Digit * 1..? %Digit * 1..?      ← error: both unbounded; last=%Digit, first=%Digit
+%Upper * 1..? %Lower * 1..?      ← ok: no uppercase letter is also lowercase
+%Digit * 1..? '-' %Digit * 1..?  ← ok: literal separator prevents direct adjacency
+%Alpha * 1..5 %Alpha * 1..?      ← ok: first repetition is bounded (* 1..5)
+```
 
 ---
 
@@ -769,7 +814,7 @@ Equivalent regex: `[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}`
 
 ```
 !substitutable = true
-field = %Any * 1..100;
+field = %Any excluding ',' * 1..100;
 {field} as col (',' {field} as col) * 0..20
 ```
 

@@ -51,7 +51,7 @@ pub fn validate(ptern: ParsedPtern) -> List(SemanticError) {
 fn known_annotation_names() -> List(String) {
   [
     "case-insensitive", "multiline", "replacements-ignore-matching",
-    "substitutable", "substitutions-ignore-matching",
+    "substitutable", "substitutions-ignore-matching", "allow-backtracking",
   ]
 }
 

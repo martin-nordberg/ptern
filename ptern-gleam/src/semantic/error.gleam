@@ -67,4 +67,19 @@ pub type SemanticError {
   /// Both sides of `excluding` are structurally identical (e.g. `%Digit excluding %Digit`),
   /// so the resulting character class is always empty.
   EmptyCharacterSet
+
+  /// Inside a variable-length repetition, two branches have overlapping last/first
+  /// character sets, so the engine may re-split a previously consumed prefix.
+  /// The check is conservative: some safe patterns are also rejected.
+  /// Add `!allow-backtracking = true` to opt out.
+  AmbiguousRepetitionAdjacency(branch_a: String, branch_b: String)
+
+  /// A variable-length repetition body can overlap itself across iterations
+  /// (last-char set ∩ first-char set ≠ ∅), enabling catastrophic backtracking.
+  /// Add `!allow-backtracking = true` to opt out.
+  AmbiguousRepetitionBody
+
+  /// Two consecutive unbounded repetitions whose character sets overlap: the
+  /// engine cannot determine where the first ends and the second begins.
+  AmbiguousAdjacentRepetition
 }

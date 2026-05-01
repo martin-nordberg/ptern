@@ -940,6 +940,7 @@ pub fn blank_line_invalid_test() {
 // ---------------------------------------------------------------------------
 
 const dq_string_src = "
+  !allow-backtracking = true
   char = %Any excluding '\"';
   '\"' ({char} | '\\\"') * 0..1000 '\"'
 "
