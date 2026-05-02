@@ -352,7 +352,7 @@ The following constraints are checked after parsing. A ptern that violates any c
 
 ### 7.3 Exclusion Constraints
 
-**Single-character operands** — Both sides of `excluding` must match exactly one character. A group `(...)` or an interpolation `{...}` on either side of `excluding` is an error.
+**Character-set operands** — Both sides of `excluding` must be character-set expressions. The accepted forms are: a character class (`%Class`), a single-character literal (`'x'`), a character range (`'a'..'z'`), or a **flat union group** — `(A | B | …)` where every alternative is a single bare character class, single-character literal, or character range (no named captures, no repetition counts, no nested `excluding`, no interpolations). An interpolation `{name}` on either side is always an error.
 
 **Non-empty result** — When both operands are structurally identical (e.g. `%Digit excluding %Digit` or `'x' excluding 'x'` or `'a'..'z' excluding 'a'..'z'`), the resulting character class can never match any character and is a compile-time error.
 
@@ -473,7 +473,7 @@ Each construct defines the set of strings it matches:
 | `'text'` or `"text"`             | Exactly the literal string `text`                        |
 | `%Class`                          | Any single character in the named class (§5)            |
 | `'a'..'z'`                        | Any single character whose code point is in the range   |
-| `E excluding F`                   | Any single character matched by `E` but not by `F`      |
+| `E excluding F`                   | Any single character matched by `E` but not by `F`; `F` may be a flat union group `(A \| B \| …)` |
 | `E1 E2 ... En` (sequence)        | A string that is the concatenation of strings matching each `Ei` in order |
 | `E1 \| E2 \| ... \| En` (alternation) | A string matched by any one of the `Ei`; leftmost matching branch is selected |
 | `(E)` (group)                     | Same as `E`; used to override precedence                |

@@ -232,6 +232,21 @@ pub fn exclusion_range_from_range_test() {
   |> should.equal("[[a-z]--[x]]")
 }
 
+pub fn exclusion_group_single_chars_test() {
+  source("%Digit excluding ('1'|'3'|'5'|'7'|'9')")
+  |> should.equal("[[0-9]--[13579]]")
+}
+
+pub fn exclusion_group_with_range_test() {
+  source("%Alpha excluding ('a'..'e' | 'x')")
+  |> should.equal("[[A-Za-z]--[[a-e]x]]")
+}
+
+pub fn exclusion_group_single_alt_test() {
+  source("'a'..'z' excluding ('x')")
+  |> should.equal("[[a-z]--[x]]")
+}
+
 // ---------------------------------------------------------------------------
 // Groups
 // ---------------------------------------------------------------------------

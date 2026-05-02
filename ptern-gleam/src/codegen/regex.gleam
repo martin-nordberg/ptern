@@ -295,6 +295,8 @@ fn range_item_as_class_operand(
     SingleAtom(Literal(raw)) -> "[" <> raw_to_class_char(raw) <> "]"
     CharRange(Literal(from_raw), Literal(to_raw)) ->
       "[" <> raw_to_class_char(from_raw) <> "-" <> raw_to_class_char(to_raw) <> "]"
+    SingleAtom(Group(Alternation(alts))) ->
+      "[" <> string.concat(list.map(alts, sequence_as_class_body)) <> "]"
     SingleAtom(atom) -> "[" <> compile_atom(atom, defs, []) <> "]"
     CharRange(_, _) -> "[(?!)]"
   }

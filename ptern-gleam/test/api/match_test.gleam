@@ -516,7 +516,8 @@ pub fn inverted_range_digits_test() {
 }
 
 pub fn invalid_exclusion_operand_group_test() {
-  ptern.compile("'a'..'z' excluding ('x')")
+  // sequence of two items inside the group → invalid
+  ptern.compile("'a'..'z' excluding ('x' 'y')")
   |> has_semantic_error(error.InvalidExclusionOperand)
   |> should.be_true
 }

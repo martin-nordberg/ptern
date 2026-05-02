@@ -220,13 +220,40 @@ fn validate_exclusion(
 }
 
 // A range item is a "character set" when it is a char-class, a single-char
-// literal, or a char-range with literal endpoints. Groups and interpolations
-// cannot be used as operands to `excluding`.
-fn is_char_set(item: RangeItem) -> Bool {
+// literal, or a char-range with literal endpoints. Does not accept groups;
+// used as the non-recursive base for is_char_set.
+fn is_simple_char_set(item: RangeItem) -> Bool {
   case item {
     SingleAtom(Literal(_)) -> True
     SingleAtom(CharClass(_)) -> True
     CharRange(Literal(_), Literal(_)) -> True
+    _ -> False
+  }
+}
+
+// Extends is_simple_char_set to also accept a flat union group:
+// (A | B | …) where every alternative is a single bare char-set item
+// (no name, no repetition count, no nested excluding, no interpolations).
+fn is_char_set(item: RangeItem) -> Bool {
+  case item {
+    SingleAtom(Group(Alternation(alts))) ->
+      !list.is_empty(alts) && list.all(alts, is_char_set_group_alt)
+    _ -> is_simple_char_set(item)
+  }
+}
+
+// True when a sequence is a single unnamed, uncounted, non-excluding item
+// whose base passes is_simple_char_set (groups-within-groups are blocked).
+fn is_char_set_group_alt(seq: Sequence) -> Bool {
+  let Sequence(items) = seq
+  case items {
+    [ast.Capture(
+      inner: ast.Repetition(
+        inner: ast.Exclusion(base: base, excluded: None),
+        count: None,
+      ),
+      name: None,
+    )] -> is_simple_char_set(base)
     _ -> False
   }
 }

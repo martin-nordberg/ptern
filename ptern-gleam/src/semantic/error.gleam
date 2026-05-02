@@ -29,8 +29,11 @@ pub type SemanticError {
   /// A `* m..n` repetition has `m > n`.
   InvertedRepetitionBounds(min: Int, max: Int)
 
-  /// An `excluding` expression has an operand that is not a character set
-  /// (i.e. a group or an interpolation appears on either side).
+  /// An `excluding` expression has an operand that is not a character set.
+  /// Valid operands: a char class, a single-char literal, a char range, or a
+  /// flat union group `(A | B | …)` where every alternative is one of those
+  /// three forms with no name, repetition count, nested excluding, or
+  /// interpolation. Interpolations and all other forms are always invalid.
   InvalidExclusionOperand
 
   /// An annotation name is not in the set of recognised annotation names.

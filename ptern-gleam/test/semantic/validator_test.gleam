@@ -183,14 +183,57 @@ pub fn non_empty_exclusion_different_operands_valid_test() {
   |> should.equal([])
 }
 
-pub fn invalid_exclusion_group_operand_test() {
-  let errs = validate("'a'..'z' excluding ('a')")
+pub fn valid_exclusion_group_literals_test() {
+  validate("%Digit excluding ('1'|'3'|'5'|'7'|'9')")
+  |> should.equal([])
+}
+
+pub fn valid_exclusion_group_single_alt_test() {
+  validate("'a'..'z' excluding ('a')")
+  |> should.equal([])
+}
+
+pub fn valid_exclusion_group_with_range_test() {
+  validate("%Alpha excluding ('a'..'e' | 'x')")
+  |> should.equal([])
+}
+
+pub fn valid_exclusion_group_with_charclass_test() {
+  validate("%Any excluding (%Digit | 'x')")
+  |> should.equal([])
+}
+
+pub fn invalid_exclusion_group_multi_item_seq_test() {
+  // sequence of two items inside the group → invalid
+  let errs = validate("'a'..'z' excluding ('a' 'b')")
+  errs |> has_error(InvalidExclusionOperand) |> should.be_true
+}
+
+pub fn invalid_exclusion_group_named_capture_test() {
+  let errs = validate("%Digit excluding ('1' as d)")
+  errs |> has_error(InvalidExclusionOperand) |> should.be_true
+}
+
+pub fn invalid_exclusion_group_repetition_test() {
+  let errs = validate("%Digit excluding ('1' * 2)")
+  errs |> has_error(InvalidExclusionOperand) |> should.be_true
+}
+
+pub fn invalid_exclusion_nested_group_test() {
+  // group-within-group is blocked
+  let errs = validate("%Digit excluding (('1'))")
   errs |> has_error(InvalidExclusionOperand) |> should.be_true
 }
 
 pub fn invalid_exclusion_interpolation_operand_test() {
   // {x} on the right of excluding is not a char-set
   let errs = validate("d = 'a'; %Alpha excluding {d}")
+  errs |> has_error(InvalidExclusionOperand) |> should.be_true
+}
+
+pub fn invalid_exclusion_group_interpolation_test() {
+  // interpolation inside group → invalid
+  let errs = validate("d = '1'; %Digit excluding ({d})")
   errs |> has_error(InvalidExclusionOperand) |> should.be_true
 }
 
