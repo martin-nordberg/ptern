@@ -247,6 +247,21 @@ pub fn exclusion_group_single_alt_test() {
   |> should.equal("[[a-z]--[x]]")
 }
 
+pub fn exclusion_interpolation_grouped_body_test() {
+  source("oddDigit = ('1'|'3'|'5'|'7'|'9');\n%Digit excluding {oddDigit}")
+  |> should.equal("[[0-9]--[13579]]")
+}
+
+pub fn exclusion_interpolation_flat_body_test() {
+  source("odds = '1'|'3'|'5';\n%Alpha excluding {odds}")
+  |> should.equal("[[A-Za-z]--[135]]")
+}
+
+pub fn exclusion_interpolation_charclass_body_test() {
+  source("d = %Digit;\n%Alpha excluding {d}")
+  |> should.equal("[[A-Za-z]--[[0-9]]]")
+}
+
 // ---------------------------------------------------------------------------
 // Groups
 // ---------------------------------------------------------------------------

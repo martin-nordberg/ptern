@@ -140,11 +140,14 @@ fn collect_all_capture_names_atom(atom: Atom) -> List(String) {
 // Definition compilation (recursive, memoised)
 // ---------------------------------------------------------------------------
 
-pub fn compile_definitions(defs: List(Definition)) -> Dict(String, String) {
+pub fn compile_definitions(
+  defs: List(Definition),
+  class_defs: Dict(String, String),
+) -> Dict(String, String) {
   let def_bodies: Dict(String, Expression) =
     list.fold(defs, dict.new(), fn(m, def) { dict.insert(m, def.name, def.body) })
   list.fold(defs, dict.new(), fn(compiled, def) {
-    compile_def_memo(def.name, def_bodies, compiled)
+    compile_def_memo(def.name, def_bodies, compiled, class_defs)
   })
 }
 
@@ -152,6 +155,7 @@ fn compile_def_memo(
   name: String,
   def_bodies: Dict(String, Expression),
   compiled: Dict(String, String),
+  class_defs: Dict(String, String),
 ) -> Dict(String, String) {
   case dict.get(compiled, name) {
     Ok(_) -> compiled
@@ -161,13 +165,105 @@ fn compile_def_memo(
       let compiled2 =
         list.fold(deps, compiled, fn(c, dep) {
           case dict.has_key(def_bodies, dep) {
-            True -> compile_def_memo(dep, def_bodies, c)
+            True -> compile_def_memo(dep, def_bodies, c, class_defs)
             False -> c
           }
         })
-      let frag = compile_expression(body, compiled2, [])
+      let frag = compile_expression(body, compiled2, class_defs, [])
       dict.insert(compiled2, name, frag)
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Class-operand compilation for definitions used in `excluding` contexts
+// ---------------------------------------------------------------------------
+
+// Build class-operand strings (e.g. "[13579]") for definitions whose bodies
+// are pure char-set expressions. Used by range_item_as_class_operand when an
+// interpolation appears as an `excluding` operand.
+pub fn compile_class_definitions(defs: List(ast.Definition)) -> Dict(String, String) {
+  let def_bodies =
+    list.fold(defs, dict.new(), fn(m, def) { dict.insert(m, def.name, def.body) })
+  list.fold(defs, dict.new(), fn(class_compiled, def) {
+    compile_class_def_memo(def.name, def_bodies, class_compiled)
+  })
+}
+
+fn compile_class_def_memo(
+  name: String,
+  def_bodies: Dict(String, Expression),
+  class_compiled: Dict(String, String),
+) -> Dict(String, String) {
+  case dict.get(class_compiled, name) {
+    Ok(_) -> class_compiled
+    Error(_) ->
+      case dict.get(def_bodies, name) {
+        Error(_) -> class_compiled
+        Ok(body) -> {
+          let deps = interpolations_in_expression(body)
+          let class_compiled2 =
+            list.fold(deps, class_compiled, fn(c, dep) {
+              case dict.has_key(def_bodies, dep) {
+                True -> compile_class_def_memo(dep, def_bodies, c)
+                False -> c
+              }
+            })
+          let class_body = expr_as_class_body(body, class_compiled2)
+          case class_body {
+            "" -> class_compiled2
+            _ -> dict.insert(class_compiled2, name, "[" <> class_body <> "]")
+          }
+        }
+      }
+  }
+}
+
+// Returns the fragment to place inside `[...]` for a definition body that is
+// a pure char-set expression. Returns "" for non-qualifying bodies.
+fn expr_as_class_body(
+  expr: Expression,
+  class_defs: Dict(String, String),
+) -> String {
+  let Alternation(alts) = expr
+  let parts = list.map(alts, seq_as_class_body_ext(_, class_defs))
+  case list.any(parts, fn(p) { p == "" }) {
+    True -> ""
+    False -> string.concat(parts)
+  }
+}
+
+fn seq_as_class_body_ext(
+  seq: Sequence,
+  class_defs: Dict(String, String),
+) -> String {
+  let Sequence(items) = seq
+  case items {
+    [ast.Capture(
+      inner: ast.Repetition(
+        inner: ast.Exclusion(base: base, excluded: None),
+        count: None,
+      ),
+      name: None,
+    )] -> range_item_as_class_body_ext(base, class_defs)
+    _ -> ""
+  }
+}
+
+fn range_item_as_class_body_ext(
+  item: RangeItem,
+  class_defs: Dict(String, String),
+) -> String {
+  case item {
+    SingleAtom(Literal(raw)) -> raw_to_class_char(raw)
+    SingleAtom(CharClass(name)) -> char_class_standalone(name)
+    CharRange(Literal(from_raw), Literal(to_raw)) ->
+      "[" <> raw_to_class_char(from_raw) <> "-" <> raw_to_class_char(to_raw) <> "]"
+    SingleAtom(Group(Alternation(alts))) ->
+      string.concat(list.map(alts, seq_as_class_body_ext(_, class_defs)))
+    SingleAtom(Interpolation(dep_name)) ->
+      result.unwrap(dict.get(class_defs, dep_name), "")
+    _ -> ""
   }
 }
 
@@ -184,6 +280,7 @@ fn compile_def_memo(
 pub fn compile_expression(
   expr: Expression,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   suppressed: List(String),
 ) -> String {
   let Alternation(seqs) = expr
@@ -194,7 +291,7 @@ pub fn compile_expression(
   case mergeable {
     True -> "[" <> string.concat(list.map(seqs, sequence_as_class_body)) <> "]"
     False ->
-      list.map(seqs, fn(seq) { compile_sequence(seq, defs, suppressed) })
+      list.map(seqs, fn(seq) { compile_sequence(seq, defs, class_defs, suppressed) })
       |> string.join("|")
   }
 }
@@ -202,19 +299,21 @@ pub fn compile_expression(
 fn compile_sequence(
   seq: Sequence,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   suppressed: List(String),
 ) -> String {
   let Sequence(items) = seq
-  list.map(items, fn(cap) { compile_capture(cap, defs, suppressed) })
+  list.map(items, fn(cap) { compile_capture(cap, defs, class_defs, suppressed) })
   |> string.join("")
 }
 
 fn compile_capture(
   cap: Capture,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   suppressed: List(String),
 ) -> String {
-  let body = compile_repetition(cap.inner, defs, suppressed)
+  let body = compile_repetition(cap.inner, defs, class_defs, suppressed)
   case cap.name {
     None -> body
     Some(name) ->
@@ -228,9 +327,10 @@ fn compile_capture(
 fn compile_repetition(
   rep: Repetition,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   suppressed: List(String),
 ) -> String {
-  let body = compile_exclusion(rep.inner, defs, suppressed)
+  let body = compile_exclusion(rep.inner, defs, class_defs, suppressed)
   case rep.count {
     None -> body
     Some(rc) -> wrap_if_needed(body) <> compile_quantifier(rc)
@@ -240,13 +340,14 @@ fn compile_repetition(
 fn compile_exclusion(
   excl: Exclusion,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   suppressed: List(String),
 ) -> String {
   case excl.excluded {
-    None -> compile_range_item(excl.base, defs, suppressed)
+    None -> compile_range_item(excl.base, defs, class_defs, suppressed)
     Some(excl_item) -> {
-      let base_class = range_item_as_class_operand(excl.base, defs)
-      let excl_class = range_item_as_class_operand(excl_item, defs)
+      let base_class = range_item_as_class_operand(excl.base, defs, class_defs)
+      let excl_class = range_item_as_class_operand(excl_item, defs, class_defs)
       "[" <> base_class <> "--" <> excl_class <> "]"
     }
   }
@@ -255,10 +356,11 @@ fn compile_exclusion(
 fn compile_range_item(
   item: RangeItem,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   suppressed: List(String),
 ) -> String {
   case item {
-    SingleAtom(atom) -> compile_atom(atom, defs, suppressed)
+    SingleAtom(atom) -> compile_atom(atom, defs, class_defs, suppressed)
     CharRange(Literal(from_raw), Literal(to_raw)) ->
       "[" <> raw_to_class_char(from_raw) <> "-" <> raw_to_class_char(to_raw) <> "]"
     CharRange(_, _) -> "(?!)"
@@ -268,6 +370,7 @@ fn compile_range_item(
 fn compile_atom(
   atom: Atom,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   suppressed: List(String),
 ) -> String {
   case atom {
@@ -275,7 +378,7 @@ fn compile_atom(
     CharClass(name) -> char_class_standalone(name)
     Interpolation(name) ->
       "(?:" <> result.unwrap(dict.get(defs, name), "(?!)") <> ")"
-    Group(expr) -> "(?:" <> compile_expression(expr, defs, suppressed) <> ")"
+    Group(expr) -> "(?:" <> compile_expression(expr, defs, class_defs, suppressed) <> ")"
     PositionAssertion(name) -> compile_position_assertion(name)
   }
 }
@@ -289,6 +392,7 @@ fn compile_atom(
 fn range_item_as_class_operand(
   item: RangeItem,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
 ) -> String {
   case item {
     SingleAtom(CharClass(name)) -> char_class_standalone(name)
@@ -297,7 +401,9 @@ fn range_item_as_class_operand(
       "[" <> raw_to_class_char(from_raw) <> "-" <> raw_to_class_char(to_raw) <> "]"
     SingleAtom(Group(Alternation(alts))) ->
       "[" <> string.concat(list.map(alts, sequence_as_class_body)) <> "]"
-    SingleAtom(atom) -> "[" <> compile_atom(atom, defs, []) <> "]"
+    SingleAtom(Interpolation(name)) ->
+      result.unwrap(dict.get(class_defs, name), "[(?!)]")
+    SingleAtom(atom) -> "[" <> compile_atom(atom, defs, class_defs, []) <> "]"
     CharRange(_, _) -> "[(?!)]"
   }
 }
@@ -342,9 +448,9 @@ fn sequence_as_class_body(seq: Sequence) -> String {
     None -> range_item_as_class_body(excl.base)
     Some(excl_item) ->
       "["
-      <> range_item_as_class_operand(excl.base, dict.new())
+      <> range_item_as_class_operand(excl.base, dict.new(), dict.new())
       <> "--"
-      <> range_item_as_class_operand(excl_item, dict.new())
+      <> range_item_as_class_operand(excl_item, dict.new(), dict.new())
       <> "]"
   }
 }
@@ -641,52 +747,62 @@ fn interpolations_in_atom(atom: Atom) -> List(String) {
 pub fn collect_capture_validators(
   expr: Expression,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
 ) -> List(#(String, String)) {
   let Alternation(seqs) = expr
-  list.flat_map(seqs, fn(seq) { collect_validators_in_sequence(seq, defs) })
+  list.flat_map(seqs, fn(seq) {
+    collect_validators_in_sequence(seq, defs, class_defs)
+  })
 }
 
 fn collect_validators_in_sequence(
   seq: Sequence,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
 ) -> List(#(String, String)) {
   let Sequence(items) = seq
-  list.flat_map(items, fn(cap) { collect_validators_in_capture(cap, defs) })
+  list.flat_map(items, fn(cap) {
+    collect_validators_in_capture(cap, defs, class_defs)
+  })
 }
 
 fn collect_validators_in_capture(
   cap: Capture,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
 ) -> List(#(String, String)) {
-  let body = compile_repetition(cap.inner, defs, [])
+  let body = compile_repetition(cap.inner, defs, class_defs, [])
   let own = case cap.name {
     None -> []
     Some(name) -> [#(name, body)]
   }
-  let nested = collect_validators_in_repetition(cap.inner, defs)
+  let nested = collect_validators_in_repetition(cap.inner, defs, class_defs)
   list.append(own, nested)
 }
 
 fn collect_validators_in_repetition(
   rep: Repetition,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
 ) -> List(#(String, String)) {
-  collect_validators_in_exclusion(rep.inner, defs)
+  collect_validators_in_exclusion(rep.inner, defs, class_defs)
 }
 
 fn collect_validators_in_exclusion(
   excl: Exclusion,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
 ) -> List(#(String, String)) {
-  collect_validators_in_range_item(excl.base, defs)
+  collect_validators_in_range_item(excl.base, defs, class_defs)
 }
 
 fn collect_validators_in_range_item(
   item: RangeItem,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
 ) -> List(#(String, String)) {
   case item {
-    SingleAtom(atom) -> collect_validators_in_atom(atom, defs)
+    SingleAtom(atom) -> collect_validators_in_atom(atom, defs, class_defs)
     CharRange(_, _) -> []
   }
 }
@@ -694,9 +810,10 @@ fn collect_validators_in_range_item(
 fn collect_validators_in_atom(
   atom: Atom,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
 ) -> List(#(String, String)) {
   case atom {
-    Group(expr) -> collect_capture_validators(expr, defs)
+    Group(expr) -> collect_capture_validators(expr, defs, class_defs)
     _ -> []
   }
 }
@@ -735,10 +852,11 @@ pub type RepetitionInfo {
 pub fn compile_expression_with_rep_info(
   expr: Expression,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   counter: Int,
 ) -> #(String, List(RepetitionInfo), Int) {
   let #(src, infos, new_ctr, _seen) =
-    compile_expression_ri(expr, defs, counter, [])
+    compile_expression_ri(expr, defs, class_defs, counter, [])
   #(src, infos, new_ctr)
 }
 
@@ -746,6 +864,7 @@ pub fn compile_expression_with_rep_info(
 fn compile_expression_ri(
   expr: Expression,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   counter: Int,
   seen: List(String),
 ) -> #(String, List(RepetitionInfo), Int, List(String)) {
@@ -766,7 +885,7 @@ fn compile_expression_ri(
         list.fold(seqs, #([], [], counter, seen), fn(acc, seq) {
           let #(parts, all_infos, ctr, cur_seen) = acc
           let #(s, new_infos, new_ctr, new_seen) =
-            compile_sequence_ri(seq, defs, ctr, cur_seen)
+            compile_sequence_ri(seq, defs, class_defs, ctr, cur_seen)
           #([s, ..parts], list.append(all_infos, new_infos), new_ctr, new_seen)
         })
       #(string.join(list.reverse(rev_parts), "|"), infos, final_ctr, final_seen)
@@ -777,6 +896,7 @@ fn compile_expression_ri(
 fn compile_sequence_ri(
   seq: Sequence,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   counter: Int,
   seen: List(String),
 ) -> #(String, List(RepetitionInfo), Int, List(String)) {
@@ -785,7 +905,7 @@ fn compile_sequence_ri(
     list.fold(items, #([], [], counter, seen), fn(acc, cap) {
       let #(parts, all_infos, ctr, cur_seen) = acc
       let #(s, new_infos, new_ctr, new_seen) =
-        compile_capture_ri(cap, defs, ctr, cur_seen)
+        compile_capture_ri(cap, defs, class_defs, ctr, cur_seen)
       #([s, ..parts], list.append(all_infos, new_infos), new_ctr, new_seen)
     })
   #(string.join(list.reverse(rev_parts), ""), infos, final_ctr, final_seen)
@@ -794,11 +914,12 @@ fn compile_sequence_ri(
 fn compile_capture_ri(
   cap: Capture,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   counter: Int,
   seen: List(String),
 ) -> #(String, List(RepetitionInfo), Int, List(String)) {
   let #(body, infos, new_ctr, new_seen) =
-    compile_repetition_ri(cap.inner, defs, counter, seen)
+    compile_repetition_ri(cap.inner, defs, class_defs, counter, seen)
   case cap.name {
     None -> #(body, infos, new_ctr, new_seen)
     Some(name) ->
@@ -819,27 +940,28 @@ fn compile_capture_ri(
 fn compile_repetition_ri(
   rep: Repetition,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   counter: Int,
   seen: List(String),
 ) -> #(String, List(RepetitionInfo), Int, List(String)) {
   case rep.count {
-    None -> compile_exclusion_ri(rep.inner, defs, counter, seen)
+    None -> compile_exclusion_ri(rep.inner, defs, class_defs, counter, seen)
     Some(rc) -> {
       let inner_caps = collect_all_capture_names_excl(rep.inner)
       case inner_caps {
         [] -> {
           // No named captures in body; recurse for nested reps but no wrapper.
           let #(body, infos, new_ctr, new_seen) =
-            compile_exclusion_ri(rep.inner, defs, counter, seen)
+            compile_exclusion_ri(rep.inner, defs, class_defs, counter, seen)
           #(wrap_if_needed(body) <> compile_quantifier(rc), infos, new_ctr, new_seen)
         }
         caps -> {
           // Named captures in body — wrap the whole repetition in __rep_N.
           let rep_name = "__rep_" <> int.to_string(counter)
           let #(main_body, inner_infos, new_ctr, new_seen) =
-            compile_exclusion_ri(rep.inner, defs, counter + 1, seen)
+            compile_exclusion_ri(rep.inner, defs, class_defs, counter + 1, seen)
           // Sub-regex: one iteration, no seen-suppression (named groups present).
-          let sub_source = compile_exclusion(rep.inner, defs, [])
+          let sub_source = compile_exclusion(rep.inner, defs, class_defs, [])
           let main =
             "(?<"
             <> rep_name
@@ -858,14 +980,15 @@ fn compile_repetition_ri(
 fn compile_exclusion_ri(
   excl: Exclusion,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   counter: Int,
   seen: List(String),
 ) -> #(String, List(RepetitionInfo), Int, List(String)) {
   case excl.excluded {
-    None -> compile_range_item_ri(excl.base, defs, counter, seen)
+    None -> compile_range_item_ri(excl.base, defs, class_defs, counter, seen)
     Some(excl_item) -> {
-      let base_class = range_item_as_class_operand(excl.base, defs)
-      let excl_class = range_item_as_class_operand(excl_item, defs)
+      let base_class = range_item_as_class_operand(excl.base, defs, class_defs)
+      let excl_class = range_item_as_class_operand(excl_item, defs, class_defs)
       #("[" <> base_class <> "--" <> excl_class <> "]", [], counter, seen)
     }
   }
@@ -874,11 +997,12 @@ fn compile_exclusion_ri(
 fn compile_range_item_ri(
   item: RangeItem,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   counter: Int,
   seen: List(String),
 ) -> #(String, List(RepetitionInfo), Int, List(String)) {
   case item {
-    SingleAtom(atom) -> compile_atom_ri(atom, defs, counter, seen)
+    SingleAtom(atom) -> compile_atom_ri(atom, defs, class_defs, counter, seen)
     CharRange(Literal(from_raw), Literal(to_raw)) -> #(
       "[" <> raw_to_class_char(from_raw) <> "-" <> raw_to_class_char(to_raw) <> "]",
       [],
@@ -892,6 +1016,7 @@ fn compile_range_item_ri(
 fn compile_atom_ri(
   atom: Atom,
   defs: Dict(String, String),
+  class_defs: Dict(String, String),
   counter: Int,
   seen: List(String),
 ) -> #(String, List(RepetitionInfo), Int, List(String)) {
@@ -906,7 +1031,7 @@ fn compile_atom_ri(
     )
     Group(expr) -> {
       let #(inner, infos, new_ctr, new_seen) =
-        compile_expression_ri(expr, defs, counter, seen)
+        compile_expression_ri(expr, defs, class_defs, counter, seen)
       #("(?:" <> inner <> ")", infos, new_ctr, new_seen)
     }
     PositionAssertion(name) -> #(compile_position_assertion(name), [], counter, seen)

@@ -43,10 +43,11 @@ pub fn compile(ptern: ast.ParsedPtern) -> CompiledPtern {
     list.any(ptern.annotations, fn(a) {
       a.name == "substitutions-ignore-matching" && a.value
     })
-  let defs = regex.compile_definitions(ptern.definitions)
+  let class_defs = regex.compile_class_definitions(ptern.definitions)
+  let defs = regex.compile_definitions(ptern.definitions, class_defs)
   let #(source, rep_info, _) =
-    regex.compile_expression_with_rep_info(ptern.body, defs, 0)
-  let validators = regex.collect_capture_validators(ptern.body, defs)
+    regex.compile_expression_with_rep_info(ptern.body, defs, class_defs, 0)
+  let validators = regex.collect_capture_validators(ptern.body, defs, class_defs)
   let def_bodies =
     list.fold(ptern.definitions, dict.new(), fn(acc, def) {
       dict.insert(acc, def.name, def.body)

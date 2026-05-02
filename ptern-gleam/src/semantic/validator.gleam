@@ -206,7 +206,7 @@ fn validate_exclusion(
     Some(excl_item) -> {
       let item_errs =
         validate_range_item(excl_item, inside_rep, is_subst, def_bodies)
-      let set_errs = case is_char_set(excl.base) && is_char_set(excl_item) {
+      let set_errs = case is_char_set(excl.base, def_bodies) && is_char_set(excl_item, def_bodies) {
         False -> [InvalidExclusionOperand]
         True ->
           case excl.base == excl_item {
@@ -224,27 +224,33 @@ fn validate_exclusion(
 // used as the non-recursive base for is_char_set.
 fn is_simple_char_set(item: RangeItem) -> Bool {
   case item {
-    SingleAtom(Literal(_)) -> True
+    SingleAtom(Literal(raw)) -> decoded_length(raw) == 1
     SingleAtom(CharClass(_)) -> True
     CharRange(Literal(_), Literal(_)) -> True
     _ -> False
   }
 }
 
-// Extends is_simple_char_set to also accept a flat union group:
-// (A | B | …) where every alternative is a single bare char-set item
-// (no name, no repetition count, no nested excluding, no interpolations).
-fn is_char_set(item: RangeItem) -> Bool {
+// Extends is_simple_char_set to also accept:
+// - A flat union group `(A | B | …)` where every alternative is a single bare
+//   char-set item (no name, no repetition count, no nested excluding).
+// - An interpolation `{name}` whose definition body passes is_char_set_interp_body.
+fn is_char_set(item: RangeItem, def_bodies: Dict(String, Expression)) -> Bool {
   case item {
     SingleAtom(Group(Alternation(alts))) ->
-      !list.is_empty(alts) && list.all(alts, is_char_set_group_alt)
+      !list.is_empty(alts) && list.all(alts, is_char_set_group_alt(_, def_bodies))
+    SingleAtom(Interpolation(name)) ->
+      case dict.get(def_bodies, name) {
+        Error(_) -> False
+        Ok(body) -> is_char_set_interp_body(body, def_bodies)
+      }
     _ -> is_simple_char_set(item)
   }
 }
 
 // True when a sequence is a single unnamed, uncounted, non-excluding item
-// whose base passes is_simple_char_set (groups-within-groups are blocked).
-fn is_char_set_group_alt(seq: Sequence) -> Bool {
+// whose base passes is_simple_char_set (groups-within-groups are blocked inline).
+fn is_char_set_group_alt(seq: Sequence, _def_bodies: Dict(String, Expression)) -> Bool {
   let Sequence(items) = seq
   case items {
     [ast.Capture(
@@ -254,6 +260,28 @@ fn is_char_set_group_alt(seq: Sequence) -> Bool {
       ),
       name: None,
     )] -> is_simple_char_set(base)
+    _ -> False
+  }
+}
+
+// A definition body qualifies as a char-set expression when every alternative
+// is a single unnamed, uncounted, non-excluding item whose base passes the
+// full is_char_set (allowing groups, since groups are idiomatic in definitions).
+fn is_char_set_interp_body(expr: Expression, def_bodies: Dict(String, Expression)) -> Bool {
+  let Alternation(alts) = expr
+  !list.is_empty(alts) && list.all(alts, is_char_set_interp_alt(_, def_bodies))
+}
+
+fn is_char_set_interp_alt(seq: Sequence, def_bodies: Dict(String, Expression)) -> Bool {
+  let Sequence(items) = seq
+  case items {
+    [ast.Capture(
+      inner: ast.Repetition(
+        inner: ast.Exclusion(base: base, excluded: None),
+        count: None,
+      ),
+      name: None,
+    )] -> is_char_set(base, def_bodies)
     _ -> False
   }
 }

@@ -203,6 +203,22 @@ pub fn valid_exclusion_group_with_charclass_test() {
   |> should.equal([])
 }
 
+pub fn valid_exclusion_interpolation_test() {
+  validate("oddDigit = ('1'|'3'|'5'|'7'|'9');\n%Digit excluding {oddDigit}")
+  |> should.equal([])
+}
+
+pub fn valid_exclusion_interpolation_flat_body_test() {
+  validate("odds = '1'|'3'|'5';\n%Digit excluding {odds}")
+  |> should.equal([])
+}
+
+pub fn invalid_exclusion_interpolation_non_charset_test() {
+  // definition body is a multi-char literal — not a char-set expression
+  let errs = validate("greeting = 'hello';\n%Alpha excluding {greeting}")
+  errs |> has_error(InvalidExclusionOperand) |> should.be_true
+}
+
 pub fn invalid_exclusion_group_multi_item_seq_test() {
   // sequence of two items inside the group → invalid
   let errs = validate("'a'..'z' excluding ('a' 'b')")
@@ -226,8 +242,8 @@ pub fn invalid_exclusion_nested_group_test() {
 }
 
 pub fn invalid_exclusion_interpolation_operand_test() {
-  // {x} on the right of excluding is not a char-set
-  let errs = validate("d = 'a'; %Alpha excluding {d}")
+  // definition body is a multi-item sequence — not a char-set expression
+  let errs = validate("d = 'a' 'b'; %Alpha excluding {d}")
   errs |> has_error(InvalidExclusionOperand) |> should.be_true
 }
 
