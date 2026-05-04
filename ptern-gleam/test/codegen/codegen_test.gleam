@@ -382,6 +382,21 @@ pub fn line_boundary_in_definition_auto_enables_multiline_test() {
   flags("row = @line-start %Alpha * 1..? @line-end; {row}") |> should.equal("vm")
 }
 
+// ---------------------------------------------------------------------------
+// Backreferences
+// ---------------------------------------------------------------------------
+
+pub fn backreference_emits_k_syntax_test() {
+  source("%Alpha * 1..? as word '-' {word}")
+  |> should.equal("(?<word>[A-Za-z]+)-\\k<word>")
+}
+
+pub fn backreference_after_definition_interp_emits_correctly_test() {
+  // {num} is a definition interpolation; {tag} is a capture backreference
+  source("num = %Digit * 1..3; {num} as tag ':' {tag}")
+  |> should.equal("(?<tag>(?:[0-9]{1,3})):\\k<tag>")
+}
+
 pub fn exclusion_interp_nested_alts_probe_test() {
   // Does (('1'|'3')|('7'|'9')) work as a definition body for excluding?
   // Expected: validator rejects it → compile returns Error

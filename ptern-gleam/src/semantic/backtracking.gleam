@@ -5,8 +5,8 @@ import gleam/string
 import parser/ast.{
   type Atom, type Capture, type Exclusion, type Expression, type ParsedPtern,
   type Repetition, type Sequence,
-  Alternation, CharClass, CharRange, Exact, Group, Interpolation, Literal,
-  PositionAssertion, RepCount, Sequence, SingleAtom, Unbounded,
+  Alternation, Capture, CharClass, CharRange, Exact, Group, Interpolation,
+  Literal, PositionAssertion, RepCount, Sequence, SingleAtom, Unbounded,
 }
 import semantic/error.{
   type SemanticError, AmbiguousAdjacentRepetition, AmbiguousRepetitionAdjacency,
@@ -21,7 +21,11 @@ pub fn check(ptern: ParsedPtern) -> List(SemanticError) {
   case annotation_is_true(ptern.annotations, "allow-backtracking") {
     True -> []
     False -> {
-      let defs = build_defs(ptern.definitions)
+      let defs =
+        dict.merge(
+          build_defs(ptern.definitions),
+          build_capture_exprs(ptern.body),
+        )
       let ctx = WalkContext(defs: defs)
       check_expression(ptern.body, ctx)
     }
@@ -625,6 +629,60 @@ fn build_defs(
   list.fold(definitions, dict.new(), fn(acc, def) {
     dict.insert(acc, def.name, def.body)
   })
+}
+
+// Build a dict mapping each capture name to a singleton Expression wrapping
+// its body — used so charset/nullable/fixed-len functions resolve backreferences
+// the same way they resolve definition interpolations.  First occurrence wins.
+fn build_capture_exprs(expr: Expression) -> Dict(String, Expression) {
+  collect_caps_from_expr(expr, dict.new())
+}
+
+fn collect_caps_from_expr(
+  expr: Expression,
+  acc: Dict(String, Expression),
+) -> Dict(String, Expression) {
+  let Alternation(alts) = expr
+  list.fold(alts, acc, fn(a, seq) { collect_caps_from_seq(seq, a) })
+}
+
+fn collect_caps_from_seq(
+  seq: Sequence,
+  acc: Dict(String, Expression),
+) -> Dict(String, Expression) {
+  let Sequence(items) = seq
+  list.fold(items, acc, fn(a, cap) { collect_caps_from_cap(cap, a) })
+}
+
+fn collect_caps_from_cap(
+  cap: Capture,
+  acc: Dict(String, Expression),
+) -> Dict(String, Expression) {
+  let acc2 = case cap.name {
+    None -> acc
+    Some(name) ->
+      case dict.has_key(acc, name) {
+        True -> acc
+        False -> {
+          let cap_expr =
+            Alternation(alternatives: [
+              Sequence(items: [Capture(inner: cap.inner, name: None)]),
+            ])
+          dict.insert(acc, name, cap_expr)
+        }
+      }
+  }
+  collect_caps_from_excl(cap.inner.inner, acc2)
+}
+
+fn collect_caps_from_excl(
+  excl: Exclusion,
+  acc: Dict(String, Expression),
+) -> Dict(String, Expression) {
+  case excl.base {
+    SingleAtom(Group(inner)) -> collect_caps_from_expr(inner, acc)
+    _ -> acc
+  }
 }
 
 fn seq_label(seq: Sequence) -> String {

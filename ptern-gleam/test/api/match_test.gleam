@@ -636,6 +636,30 @@ pub fn multiline_annotation_alone_enables_m_flag_test() {
   ptern.max_length(p) |> should.equal(option.None)
 }
 
+// ---------------------------------------------------------------------------
+// Backreferences
+// ---------------------------------------------------------------------------
+
+pub fn backreference_matches_repeated_word_test() {
+  let assert Ok(p) = ptern.compile("%Alpha * 1..? as word '-' {word}")
+  ptern.matches_all_of(p, "abc-abc") |> should.be_true
+  ptern.matches_all_of(p, "hello-hello") |> should.be_true
+  ptern.matches_all_of(p, "abc-xyz") |> should.be_false
+  ptern.matches_all_of(p, "abc-ab") |> should.be_false
+}
+
+pub fn backreference_captures_the_matched_text_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 1..3 as code ':' {code}")
+  let assert option.Some(m) = ptern.match_first_in(p, "42:42 rest")
+  dict.get(m.captures, "code") |> should.equal(Ok("42"))
+}
+
+pub fn backreference_is_case_sensitive_by_default_test() {
+  let assert Ok(p) = ptern.compile("%Alpha * 1..? as word ' ' {word}")
+  ptern.matches_all_of(p, "Hello Hello") |> should.be_true
+  ptern.matches_all_of(p, "Hello hello") |> should.be_false
+}
+
 // !multiline = true changes the behaviour of matches_all_of / matches_start_of /
 // matches_end_of because those operations wrap the pattern with ^ and $ anchors.
 // With the m flag those anchors match at line boundaries, not just string boundaries.

@@ -377,7 +377,10 @@ fn compile_atom(
     Literal(raw) -> raw_to_regex(raw)
     CharClass(name) -> char_class_standalone(name)
     Interpolation(name) ->
-      "(?:" <> result.unwrap(dict.get(defs, name), "(?!)") <> ")"
+      case dict.get(defs, name) {
+        Ok(pattern) -> "(?:" <> pattern <> ")"
+        Error(_) -> "\\k<" <> name <> ">"
+      }
     Group(expr) -> "(?:" <> compile_expression(expr, defs, class_defs, suppressed) <> ")"
     PositionAssertion(name) -> compile_position_assertion(name)
   }
@@ -1029,7 +1032,10 @@ fn compile_atom_ri(
     Literal(raw) -> #(raw_to_regex(raw), [], counter, seen)
     CharClass(name) -> #(char_class_standalone(name), [], counter, seen)
     Interpolation(name) -> #(
-      "(?:" <> result.unwrap(dict.get(defs, name), "(?!)") <> ")",
+      case dict.get(defs, name) {
+        Ok(pattern) -> "(?:" <> pattern <> ")"
+        Error(_) -> "\\k<" <> name <> ">"
+      },
       [],
       counter,
       seen,

@@ -212,3 +212,36 @@ pub fn allow_backtracking_false_still_checks_test() {
   |> has_error(error.AmbiguousRepetitionBody)
   |> should.be_true
 }
+
+// ---------------------------------------------------------------------------
+// Backreferences — charset and fixed-length modelling
+// ---------------------------------------------------------------------------
+
+pub fn backreference_at_top_level_no_error_test() {
+  // {word} is a backreference, not inside any repetition — no checks triggered.
+  ptern.compile("%Alpha * 1..? as word '-' {word}")
+  |> should.be_ok
+}
+
+pub fn backreference_fixed_body_not_flagged_as_variable_test() {
+  // Body of the rep is: %Alpha as c (fixed, len 1) + {c} (also len 1 since c captures %Alpha).
+  // Fixed-length body → no Check 2 even though it contains a backreference.
+  ptern.compile("(%Alpha as c {c}) * 1..?")
+  |> should.be_ok
+}
+
+pub fn backreference_adjacent_disjoint_class_not_flagged_test() {
+  // {n} backreferences %Digit, so its charset is Digit.  Adjacent to %Alpha * 1..?
+  // (charset Alpha).  Digit and Alpha are disjoint → no AmbiguousAdjacentRepetition.
+  ptern.compile("%Alpha * 1..? as n ' ' {n}")
+  |> should.be_ok
+}
+
+pub fn backreference_adjacent_same_class_still_flagged_test() {
+  // {w} * 1..? makes the backreference itself an unbounded repetition.  Its charset
+  // is Alpha (correctly derived from the capture), and it is directly adjacent to
+  // %Alpha * 1..? — so Check 4 fires.
+  ptern.compile("%Alpha * 1..? as w {w} * 1..?")
+  |> has_error(error.AmbiguousAdjacentRepetition)
+  |> should.be_true
+}

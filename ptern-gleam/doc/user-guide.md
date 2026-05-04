@@ -497,6 +497,29 @@ Definitions make the individual pieces testable in isolation and make the body r
 - If `name` is a **definition**, `{name}` expands to that definition's pattern — it matches the same strings the definition matches.
 - If `name` is a **capture** (established earlier by `expression as name`), `{name}` is a **backreference** — it matches the exact text that was captured earlier, as if it were a literal.
 
+A classic use of backreferences is detecting doubled words or matching paired delimiters:
+
+```gleam
+// Detects a repeated word separated by a space
+let assert Ok(doubled) = ptern.compile("%Alpha * 1..? as word ' ' {word}")
+
+ptern.matches_all_of(doubled, "hello hello")  // True
+ptern.matches_all_of(doubled, "hello world")  // False — different words
+ptern.matches_in(doubled, "the the problem")  // True — finds "the the"
+```
+
+```gleam
+// Matches XML-like open/close tags where the tag names must agree
+let assert Ok(element) = ptern.compile(
+  "'<' %Alpha * 1..20 as tag '>' %Any * 0..10000 '</' {tag} '>'",
+)
+
+ptern.matches_all_of(element, "<em>hello</em>")    // True
+ptern.matches_all_of(element, "<em>hello</div>")   // False — mismatched tags
+```
+
+Note that a backreference matches a runtime-determined string, so the backtracking checker models its character set as the same as the capture expression's. Patterns that are safe — even when a backreference appears adjacent to a variable-length repetition — compile without warnings. Use `!allow-backtracking = true` only if the static checks flag a pattern you have verified to be safe.
+
 ---
 
 ## Annotations
