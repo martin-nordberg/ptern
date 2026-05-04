@@ -2,6 +2,7 @@ import codegen/codegen.{type CompiledPtern}
 import gleeunit/should
 import lexer/lexer
 import parser/parser
+import ptern
 
 // ---------------------------------------------------------------------------
 // Helper: parse and compile in one step
@@ -379,4 +380,21 @@ pub fn word_boundary_does_not_add_multiline_flag_test() {
 
 pub fn line_boundary_in_definition_auto_enables_multiline_test() {
   flags("row = @line-start %Alpha * 1..? @line-end; {row}") |> should.equal("vm")
+}
+
+pub fn exclusion_interp_nested_alts_probe_test() {
+  // Does (('1'|'3')|('7'|'9')) work as a definition body for excluding?
+  // Expected: validator rejects it → compile returns Error
+  let result = ptern.compile("oddDigitExcept5 = (('1'|'3')|('7'|'9'));\n%Digit excluding {oddDigitExcept5}")
+  case result {
+    Error(_) -> "rejected"
+    Ok(_) -> "accepted"
+  }
+  |> should.equal("rejected")
+}
+
+pub fn exclusion_interp_range_alts_probe_test() {
+  // Does ('a'..'m' | 'n'..'z') as a definition body work?
+  source("rangeAlt = ('a'..'m' | 'n'..'z');\n%Alpha excluding {rangeAlt}")
+  |> should.equal("[[A-Za-z]--[[a-m][n-z]]]")
 }
