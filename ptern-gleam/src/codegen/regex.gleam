@@ -501,15 +501,20 @@ fn compile_position_assertion(name: String) -> String {
 // ---------------------------------------------------------------------------
 
 fn compile_quantifier(rc: RepCount) -> String {
-  case rc {
-    RepCount(0, Exact(1)) -> "?"
-    RepCount(0, Unbounded) -> "*"
-    RepCount(1, Unbounded) -> "+"
-    RepCount(n, Unbounded) -> "{" <> int.to_string(n) <> ",}"
-    RepCount(n, ast.None) -> "{" <> int.to_string(n) <> "}"
-    RepCount(m, Exact(n)) ->
+  let lazy_suffix = case rc.lazy {
+    True -> "?"
+    False -> ""
+  }
+  let base = case rc {
+    RepCount(0, Exact(1), _) -> "?"
+    RepCount(0, Unbounded, _) -> "*"
+    RepCount(1, Unbounded, _) -> "+"
+    RepCount(n, Unbounded, _) -> "{" <> int.to_string(n) <> ",}"
+    RepCount(n, ast.None, _) -> "{" <> int.to_string(n) <> "}"
+    RepCount(m, Exact(n), _) ->
       "{" <> int.to_string(m) <> "," <> int.to_string(n) <> "}"
   }
+  base <> lazy_suffix
 }
 
 // ---------------------------------------------------------------------------

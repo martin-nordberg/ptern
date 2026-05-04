@@ -148,7 +148,7 @@ pub fn parse_exact_repetition_test() {
             Capture(
               Repetition(
                 Exclusion(SingleAtom(CharClass("Digit")), None),
-                Some(RepCount(4, RepNone)),
+                Some(RepCount(4, RepNone, False)),
               ),
               None,
             ),
@@ -171,7 +171,7 @@ pub fn parse_bounded_repetition_test() {
             Capture(
               Repetition(
                 Exclusion(SingleAtom(Literal("x")), None),
-                Some(RepCount(3, Exact(10))),
+                Some(RepCount(3, Exact(10), False)),
               ),
               None,
             ),
@@ -194,7 +194,7 @@ pub fn parse_unbounded_repetition_test() {
             Capture(
               Repetition(
                 Exclusion(SingleAtom(CharClass("Digit")), None),
-                Some(RepCount(1, Unbounded)),
+                Some(RepCount(1, Unbounded, False)),
               ),
               None,
             ),
@@ -221,7 +221,7 @@ pub fn parse_named_capture_test() {
             Capture(
               Repetition(
                 Exclusion(SingleAtom(CharClass("Digit")), None),
-                Some(RepCount(4, RepNone)),
+                Some(RepCount(4, RepNone, False)),
               ),
               Some("year"),
             ),
@@ -461,4 +461,123 @@ pub fn parse_missing_semicolon_test() {
 pub fn parse_stray_token_test() {
   parse("'a' )")
   |> should.be_error()
+}
+
+// ---------------------------------------------------------------------------
+// Fewest (lazy repetition)
+// ---------------------------------------------------------------------------
+
+pub fn parse_fewest_unbounded_test() {
+  parse("%Any * 1..? fewest")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [],
+        [],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(
+                Exclusion(SingleAtom(CharClass("Any")), None),
+                Some(RepCount(1, Unbounded, True)),
+              ),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_fewest_optional_test() {
+  parse("%Any * 0..1 fewest")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [],
+        [],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(
+                Exclusion(SingleAtom(CharClass("Any")), None),
+                Some(RepCount(0, Exact(1), True)),
+              ),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_fewest_bounded_test() {
+  parse("%Any * 3..10 fewest")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [],
+        [],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(
+                Exclusion(SingleAtom(CharClass("Any")), None),
+                Some(RepCount(3, Exact(10), True)),
+              ),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_no_fewest_sets_lazy_false_test() {
+  parse("%Any * 1..?")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [],
+        [],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(
+                Exclusion(SingleAtom(CharClass("Any")), None),
+                Some(RepCount(1, Unbounded, False)),
+              ),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_fewest_followed_by_as_test() {
+  parse("%Any * 1..? fewest as content")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [],
+        [],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(
+                Exclusion(SingleAtom(CharClass("Any")), None),
+                Some(RepCount(1, Unbounded, True)),
+              ),
+              Some("content"),
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
 }

@@ -177,7 +177,7 @@ fn nullable_cap(cap: Capture, defs: Dict(String, Expression)) -> Bool {
 fn nullable_rep(rep: Repetition, defs: Dict(String, Expression)) -> Bool {
   case rep.count {
     None -> nullable_excl(rep.inner, defs)
-    Some(RepCount(0, _)) -> True
+    Some(RepCount(0, _, _)) -> True
     Some(_) -> False
   }
 }
@@ -427,17 +427,17 @@ fn fixed_len_of_rep(
 ) -> Option(Int) {
   case rep.count {
     None -> fixed_len_of_excl(rep.inner, defs)
-    Some(RepCount(min, ast.None)) ->
+    Some(RepCount(min, ast.None, _)) ->
       case fixed_len_of_excl(rep.inner, defs) {
         None -> None
         Some(n) -> Some(n * min)
       }
-    Some(RepCount(min, Exact(max))) ->
+    Some(RepCount(min, Exact(max), _)) ->
       case min == max, fixed_len_of_excl(rep.inner, defs) {
         True, Some(n) -> Some(n * min)
         _, _ -> None
       }
-    Some(RepCount(_, Unbounded)) -> None
+    Some(RepCount(_, Unbounded, _)) -> None
   }
 }
 
@@ -448,15 +448,15 @@ fn fixed_len_of_rep(
 fn is_variable_count(count: Option(ast.RepCount)) -> Bool {
   case count {
     None -> False
-    Some(RepCount(_, ast.None)) -> False
-    Some(RepCount(min, Exact(max))) -> min != max
-    Some(RepCount(_, Unbounded)) -> True
+    Some(RepCount(_, ast.None, _)) -> False
+    Some(RepCount(min, Exact(max), _)) -> min != max
+    Some(RepCount(_, Unbounded, _)) -> True
   }
 }
 
 fn is_unbounded_count(count: Option(ast.RepCount)) -> Bool {
   case count {
-    Some(RepCount(_, Unbounded)) -> True
+    Some(RepCount(_, Unbounded, _)) -> True
     _ -> False
   }
 }

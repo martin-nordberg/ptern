@@ -97,11 +97,11 @@ fn compute_repetition_bounds(
   let inner = compute_exclusion_bounds(rep.inner, defs)
   case rep.count {
     None -> inner
-    Some(RepCount(min, Exact(max))) ->
+    Some(RepCount(min, Exact(max), _)) ->
       Bounds(min: inner.min * min, max: mul_opt(inner.max, max))
-    Some(RepCount(min, ast.None)) ->
+    Some(RepCount(min, ast.None, _)) ->
       Bounds(min: inner.min * min, max: mul_opt(inner.max, min))
-    Some(RepCount(min, Unbounded)) ->
+    Some(RepCount(min, Unbounded, _)) ->
       Bounds(min: inner.min * min, max: None)
   }
 }

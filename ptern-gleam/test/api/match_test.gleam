@@ -691,3 +691,24 @@ pub fn position_assertion_in_repetition_error_test() {
   |> has_semantic_error(error.PositionAssertionInRepetition("word-start"))
   |> should.be_true
 }
+
+// ---------------------------------------------------------------------------
+// Fewest (lazy matching)
+// ---------------------------------------------------------------------------
+
+pub fn fewest_stops_at_first_closing_delimiter_test() {
+  // Greedy '<' %Any * 0..? '>' matches from first '<' to last '>'.
+  // Lazy '<' %Any * 0..? fewest '>' stops at the first '>'.
+  let assert Ok(greedy) = ptern.compile("'<' %Any * 0..? '>'")
+  let assert Ok(lazy) = ptern.compile("'<' %Any * 0..? fewest '>'")
+  let assert Some(greedy_match) = ptern.match_first_in(greedy, "<b><i>")
+  let assert Some(lazy_match) = ptern.match_first_in(lazy, "<b><i>")
+  greedy_match.length |> should.equal(6)
+  lazy_match.length |> should.equal(3)
+}
+
+pub fn fewest_match_all_in_finds_each_tag_test() {
+  let assert Ok(lazy) = ptern.compile("'<' %Any * 1..? fewest '>'")
+  let matches = ptern.match_all_in(lazy, "<b><i><em>")
+  list.length(matches) |> should.equal(3)
+}

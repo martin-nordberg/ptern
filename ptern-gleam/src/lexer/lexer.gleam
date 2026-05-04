@@ -4,10 +4,11 @@ import gleam/result
 import gleam/string
 import lexer/token.{
   type LexError, type Token, As, Asterisk, Bang, CharacterClass, Comment,
-  DoubleQuotedLiteral, Equals, Excluding, FalseKeyword, Identifier, Integer,
-  LeftBrace, LeftParen, AlternativeOperator, PositionAssertion, QuestionMark,
-  RangeOperator, RightBrace, RightParen, Semicolon, SingleQuotedLiteral,
-  TrueKeyword, UnexpectedCharacter, UnterminatedString, Whitespace,
+  DoubleQuotedLiteral, Equals, Excluding, FalseKeyword, Fewest, Identifier,
+  Integer, LeftBrace, LeftParen, AlternativeOperator, PositionAssertion,
+  QuestionMark, RangeOperator, RightBrace, RightParen, Semicolon,
+  SingleQuotedLiteral, TrueKeyword, UnexpectedCharacter, UnterminatedString,
+  Whitespace,
 }
 
 /// Lex a complete Ptern source string into a flat list of tokens.
@@ -305,6 +306,7 @@ fn finish_identifier(
   let token = case name {
     "as" -> As
     "excluding" -> Excluding
+    "fewest" -> Fewest
     "true" -> TrueKeyword
     "false" -> FalseKeyword
     _ -> Identifier(name)

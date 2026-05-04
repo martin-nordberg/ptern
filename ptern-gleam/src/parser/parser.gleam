@@ -1,7 +1,7 @@
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import lexer/token
+import lexer/token.{Fewest}
 import parser/ast.{
   type Annotation, type Atom, type Capture, type Definition, type Exclusion,
   type Expression, type ParseError, type ParsedPtern, type RangeItem,
@@ -250,7 +250,14 @@ fn parse_repetition(s: Stream) -> Result(#(Repetition, Stream), ParseError) {
       let #(_, s2) = stream.advance(s2)
       let s2 = stream.skip_trivia(s2)
       use #(count, s3) <- result.try(parse_rep_count(s2))
-      Ok(#(Repetition(excl, Some(count)), s3))
+      let s4 = stream.skip_trivia(s3)
+      case stream.peek_raw(s4) {
+        Some(Fewest) -> {
+          let #(_, s4) = stream.advance(s4)
+          Ok(#(Repetition(excl, Some(RepCount(count.min, count.max, True))), s4))
+        }
+        _ -> Ok(#(Repetition(excl, Some(count)), s3))
+      }
     }
     _ -> Ok(#(Repetition(excl, None), s))
   }
@@ -266,9 +273,9 @@ fn parse_rep_count(s: Stream) -> Result(#(RepCount, Stream), ParseError) {
         Some(token.RangeOperator) -> {
           let #(_, s) = stream.advance(s)
           use #(upper, s) <- result.try(parse_rep_upper(s))
-          Ok(#(RepCount(min, upper), s))
+          Ok(#(RepCount(min, upper, False), s))
         }
-        _ -> Ok(#(RepCount(min, RepNone), s))
+        _ -> Ok(#(RepCount(min, RepNone, False), s))
       }
     }
     Some(tok) ->

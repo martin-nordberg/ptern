@@ -85,4 +85,8 @@ pub type SemanticError {
   /// Two consecutive unbounded repetitions whose character sets overlap: the
   /// engine cannot determine where the first ends and the second begins.
   AmbiguousAdjacentRepetition
+
+  /// `fewest` was applied to an exact-count repetition `* n`. The iteration
+  /// count is fixed so there is no choice to minimise.
+  FewestOnExactRepetition
 }

@@ -10,9 +10,10 @@ import parser/ast.{
 }
 import semantic/error.{
   type SemanticError, BoundedRepetitionNeedsCapture, DuplicateAnnotation,
-  EmptyCharacterSet, EmptyLiteral, InvalidEscapeSequence,
-  InvalidExclusionOperand, InvalidRangeEndpoint, InvertedRange,
-  InvertedRepetitionBounds, NotSubstitutableBody, PositionAssertionInRepetition,
+  EmptyCharacterSet, EmptyLiteral, FewestOnExactRepetition,
+  InvalidEscapeSequence, InvalidExclusionOperand, InvalidRangeEndpoint,
+  InvertedRange, InvertedRepetitionBounds, NotSubstitutableBody,
+  PositionAssertionInRepetition,
   SubstitutionsIgnoreMatchingWithoutSubstitutable, UnknownAnnotation,
   UnknownPositionAssertion,
 }
@@ -167,8 +168,8 @@ fn validate_repetition(
       // are not already covered by an outer named capture (which acts as the
       // substitution point and makes the inner repetition irrelevant).
       let bounded_cap_errs = case is_subst, covered_by_capture, rc {
-        True, False, RepCount(_, Exact(_))
-        | True, False, RepCount(_, ast.Unbounded) ->
+        True, False, RepCount(_, Exact(_), _)
+        | True, False, RepCount(_, ast.Unbounded, _) ->
           case has_named_capture_in_exclusion(rep.inner) {
             True -> []
             False -> [BoundedRepetitionNeedsCapture]
@@ -188,10 +189,15 @@ fn validate_repetition(
 }
 
 fn validate_rep_count(rc: RepCount) -> List(SemanticError) {
-  case rc {
-    RepCount(min, Exact(max)) if min > max -> [InvertedRepetitionBounds(min, max)]
+  let fewest_err = case rc {
+    RepCount(_, ast.None, True) -> [FewestOnExactRepetition]
     _ -> []
   }
+  let bounds_err = case rc {
+    RepCount(min, Exact(max), _) if min > max -> [InvertedRepetitionBounds(min, max)]
+    _ -> []
+  }
+  list.append(fewest_err, bounds_err)
 }
 
 fn validate_exclusion(
@@ -389,8 +395,8 @@ fn is_substitutable_rep(
 ) -> Bool {
   case rep.count {
     None -> is_substitutable_excl(rep.inner, def_bodies)
-    Some(RepCount(_, ast.None)) -> is_substitutable_excl(rep.inner, def_bodies)
-    Some(RepCount(_, Exact(_))) | Some(RepCount(_, ast.Unbounded)) ->
+    Some(RepCount(_, ast.None, _)) -> is_substitutable_excl(rep.inner, def_bodies)
+    Some(RepCount(_, Exact(_), _)) | Some(RepCount(_, ast.Unbounded, _)) ->
       has_named_capture_in_exclusion(rep.inner)
   }
 }

@@ -45,9 +45,9 @@ pub type Repetition {
   Repetition(inner: Exclusion, count: Option(RepCount))
 }
 
-/// `min` or `min..max`.
+/// `min` or `min..max`, with an optional `fewest` modifier for lazy matching.
 pub type RepCount {
-  RepCount(min: Int, max: RepUpper)
+  RepCount(min: Int, max: RepUpper, lazy: Bool)
 }
 
 pub type RepUpper {

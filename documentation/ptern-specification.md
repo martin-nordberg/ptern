@@ -118,6 +118,7 @@ RightBrace           = '}'
 QuestionMark         = '?'
 AsKeyword            = 'as'          (followed by non-Alnum)
 ExcludingKeyword     = 'excluding'   (followed by non-Alnum)
+FewestKeyword        = 'fewest'      (followed by non-Alnum or '-')
 TrueKeyword          = 'true'        (followed by non-Alnum)
 FalseKeyword         = 'false'       (followed by non-Alnum)
 ```
@@ -148,7 +149,7 @@ sequence     = capture ( mws capture )*
 
 capture      = repetition ( mws AS-KEYWORD mws IDENTIFIER )?
 
-repetition   = exclusion ( ows ASTERISK ows rep-count )?
+repetition   = exclusion ( ows ASTERISK ows rep-count ( ows FEWEST-KEYWORD )? )?
 
 rep-count    = INTEGER ( ows RANGE-OPERATOR ows rep-upper )?
 
@@ -208,13 +209,17 @@ The `!` (bang) character immediately precedes the annotation name with no interv
 
 ### 4.5 Repetition Count Forms
 
-| Syntax      | Meaning                               |
-|:-----------:|:--------------------------------------|
-| `* n`       | Exactly `n` repetitions              |
-| `* n..m`    | Between `n` and `m` repetitions (inclusive) |
-| `* n..?`    | At least `n` repetitions, no upper bound |
+| Syntax            | Meaning                                                      |
+|:-----------------:|:-------------------------------------------------------------|
+| `* n`             | Exactly `n` repetitions (greedy; `fewest` is an error here) |
+| `* n..m`          | Between `n` and `m` repetitions, greedy (prefers `m`)       |
+| `* n..?`          | At least `n` repetitions, no upper bound, greedy            |
+| `* n..m fewest`   | Between `n` and `m` repetitions, lazy (prefers `n`)         |
+| `* n..? fewest`   | At least `n` repetitions, no upper bound, lazy              |
 
-`n` and `m` are unsigned decimal integers with at most 5 digits. The special upper bound `?` means unbounded (compiled to `*` or `+` as appropriate). `* 0..1` is the idiomatic "optional" form.
+`n` and `m` are unsigned decimal integers with at most 5 digits. The special upper bound `?` means unbounded (compiled to `*` or `+` as appropriate). `* 0..1` is the idiomatic "optional" form; `* 0..1 fewest` is the lazy optional.
+
+The `fewest` modifier causes the repetition to prefer the minimum number of iterations within the stated bounds. Without `fewest`, all repetitions are greedy (prefer the maximum). Applying `fewest` to an exact-count repetition `* n` is a compile-time error (§7.13).
 
 ---
 
@@ -416,6 +421,16 @@ The recognised position assertion names are:
 
 When `!substitutable = true` is set, the compiler verifies that the body expression is *substitutable* according to the rules in §11.2. If the body fails the check, the ptern does not compile.
 
+### 7.13 Fewest on Exact-Count Repetition
+
+Applying `fewest` to an exact-count repetition `E * n` is a compile-time error (`FewestOnExactRepetition`). The iteration count is fixed at `n`; there is no range to minimise.
+
+```
+%Digit * 4 fewest     ← error: exact count has nothing to minimise
+%Digit * 1..4 fewest  ← ok: lazy, prefers 1
+%Digit * 1..? fewest  ← ok: lazy, prefers 1
+```
+
 ### 7.12 Backtracking Safety Constraints
 
 To prevent catastrophic backtracking (ReDoS) in the compiled JavaScript regex, the compiler runs three conservative static checks on any pattern that contains variable-count repetitions. A repetition with an exact count (`E * n`) is exempt from all three checks; only `E * n..m` with `n < m` and `E * n..?` are examined. Set `!allow-backtracking = true` to suppress all three checks globally when the pattern is known to be safe.
@@ -480,6 +495,8 @@ Each construct defines the set of strings it matches:
 | `E * n`                           | Exactly `n` consecutive matches of `E` concatenated     |
 | `E * n..m`                        | Between `n` and `m` consecutive matches of `E` concatenated (greedy: prefers maximum) |
 | `E * n..?`                        | At least `n` consecutive matches of `E` concatenated (greedy) |
+| `E * n..m fewest`                 | Between `n` and `m` consecutive matches of `E` concatenated (lazy: prefers minimum) |
+| `E * n..? fewest`                 | At least `n` consecutive matches of `E` concatenated (lazy) |
 | `E as name`                       | Same strings as `E`; also records the matched text as capture `name` |
 | `{id}` (definition interpolation) | Same as the body of definition `id`                     |
 | `{id}` (backreference)            | Exactly the text previously captured by `name = id`     |

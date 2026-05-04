@@ -3,10 +3,10 @@ import lexer/lexer
 import parser/parser
 import semantic/error.{
   BoundedRepetitionNeedsCapture, DuplicateAnnotation, EmptyCharacterSet,
-  EmptyLiteral, InvalidEscapeSequence, InvalidExclusionOperand,
-  InvalidRangeEndpoint, InvertedRange, InvertedRepetitionBounds,
-  NotSubstitutableBody, SubstitutionsIgnoreMatchingWithoutSubstitutable,
-  UnknownAnnotation,
+  EmptyLiteral, FewestOnExactRepetition, InvalidEscapeSequence,
+  InvalidExclusionOperand, InvalidRangeEndpoint, InvertedRange,
+  InvertedRepetitionBounds, NotSubstitutableBody,
+  SubstitutionsIgnoreMatchingWithoutSubstitutable, UnknownAnnotation,
 }
 import semantic/validator
 
@@ -449,5 +449,39 @@ pub fn substitutions_ignore_matching_false_without_substitutable_valid_test() {
 // Captures inside repetitions are always allowed (not restricted to !substitutable).
 pub fn capture_in_repetition_allowed_without_substitutable_test() {
   validate("(%Digit as d) * 3")
+  |> should.equal([])
+}
+
+// ---------------------------------------------------------------------------
+// Fewest on exact-count repetition
+// ---------------------------------------------------------------------------
+
+pub fn fewest_on_exact_count_is_error_test() {
+  validate("%Any * 3 fewest")
+  |> should.equal([FewestOnExactRepetition])
+}
+
+pub fn fewest_on_exact_count_1_is_error_test() {
+  validate("'x' * 1 fewest")
+  |> should.equal([FewestOnExactRepetition])
+}
+
+pub fn fewest_on_unbounded_is_valid_test() {
+  validate("%Any * 1..? fewest")
+  |> should.equal([])
+}
+
+pub fn fewest_on_zero_unbounded_is_valid_test() {
+  validate("%Any * 0..? fewest")
+  |> should.equal([])
+}
+
+pub fn fewest_on_bounded_range_is_valid_test() {
+  validate("%Any * 3..10 fewest")
+  |> should.equal([])
+}
+
+pub fn fewest_on_optional_is_valid_test() {
+  validate("%Any * 0..1 fewest")
   |> should.equal([])
 }

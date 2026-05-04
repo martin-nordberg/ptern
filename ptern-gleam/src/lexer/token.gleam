@@ -70,6 +70,9 @@ pub type Token {
   /// `!case-insensitive = false`.
   FalseKeyword
 
+  /// The keyword `fewest`, used as a lazy repetition modifier: `* 1..? fewest`.
+  Fewest
+
   /// `!` — introduces an annotation, e.g. `!case-insensitive = true`.
   Bang
 

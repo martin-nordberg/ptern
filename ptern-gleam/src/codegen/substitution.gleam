@@ -145,9 +145,9 @@ fn build_plan_rep(
   }
   case rep.count {
     None -> inner
-    Some(RepCount(n, ast.None)) -> PlanFixedRep(inner, n)
-    Some(RepCount(n, Exact(m))) -> PlanBoundedRep(inner, n, Some(m))
-    Some(RepCount(n, Unbounded)) -> PlanBoundedRep(inner, n, None)
+    Some(RepCount(n, ast.None, _)) -> PlanFixedRep(inner, n)
+    Some(RepCount(n, Exact(m), _)) -> PlanBoundedRep(inner, n, Some(m))
+    Some(RepCount(n, Unbounded, _)) -> PlanBoundedRep(inner, n, None)
   }
 }
 

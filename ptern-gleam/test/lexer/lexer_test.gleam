@@ -2,7 +2,7 @@ import gleeunit/should
 import lexer/lexer
 import lexer/token.{
   As, Asterisk, Bang, CharacterClass, Comment, DoubleQuotedLiteral, Equals,
-  Excluding, FalseKeyword, Identifier, Integer, LeftBrace, LeftParen,
+  Excluding, FalseKeyword, Fewest, Identifier, Integer, LeftBrace, LeftParen,
   AlternativeOperator, QuestionMark, RangeOperator, RightBrace, RightParen,
   Semicolon, SingleQuotedLiteral, TrueKeyword, Whitespace,
 }
@@ -100,6 +100,16 @@ pub fn lex_as_keyword_test() {
 pub fn lex_excluding_keyword_test() {
   lexer.lex("excluding")
   |> should.equal(Ok([Excluding]))
+}
+
+pub fn lex_fewest_keyword_test() {
+  lexer.lex("fewest")
+  |> should.equal(Ok([Fewest]))
+}
+
+pub fn lex_fewest_not_consumed_as_prefix_of_identifier_test() {
+  lexer.lex("fewest-more")
+  |> should.equal(Ok([Identifier("fewest-more")]))
 }
 
 pub fn lex_identifier_test() {

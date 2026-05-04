@@ -354,7 +354,49 @@ let assert Ok(credit_card) = ptern.compile("%Digit * 4 ('-' %Digit * 4) * 3")
 ptern.matches_all_of(credit_card, "1234-5678-9012-3456")  // True
 ```
 
-Repetition is **greedy**: it consumes as many characters as possible while still allowing the overall pattern to match.
+### Lazy repetition: `fewest`
+
+By default, repetition is **greedy** — it consumes as many iterations as possible while still allowing the overall pattern to match. Add `fewest` after any variable-count repetition to make it **lazy**: prefer the fewest iterations that still allow the pattern to match.
+
+```gleam
+// Greedy — %Any * 1..? swallows as far as possible before stopping at '</'
+let assert Ok(greedy) = ptern.compile("'<' %Alpha * 1..? '>' %Any * 1..? '</'")
+ptern.match_first_in(greedy, "<b>hello</b><em>world</em>")
+// index 0, length 22 — runs all the way to the last '</'
+
+// Lazy — stops at the first '</'
+let assert Ok(lazy_p) = ptern.compile("'<' %Alpha * 1..? '>' %Any * 1..? fewest '</'")
+ptern.match_first_in(lazy_p, "<b>hello</b><em>world</em>")
+// index 0, length 11 — stops at the first '</'
+```
+
+`fewest` works with any variable-count form:
+
+```
+%Any * 1..? fewest      // one or more, fewest first
+%Any * 0..? fewest      // zero or more, fewest first
+%Any * 0..1 fewest      // optional, prefer not to match
+%Any * 3..10 fewest     // 3 to 10, prefer 3
+```
+
+Applying `fewest` to an exact count is a compile-time error — there is nothing to minimise when the count is fixed:
+
+```gleam
+ptern.compile("%Any * 3 fewest")
+// Error(SemanticErrors([FewestOnExactRepetition]))
+```
+
+**`fewest` vs `excluding`:** For patterns bounded by a single-character delimiter, `excluding` is the better choice — it prevents the delimiter from being consumed at all, eliminating backtracking entirely. Use `fewest` when the end delimiter is more than one character and `excluding` cannot help:
+
+```gleam
+// Single-char delimiter — use excluding (no backtracking)
+let assert Ok(quoted) = ptern.compile("'\"' %Any excluding '\"' * 0..? '\"'")
+
+// Multi-char end delimiter — use fewest
+let assert Ok(bold) = ptern.compile("'<b>' %Any * 0..? fewest '</b>'")
+```
+
+Lazy repetition is still subject to the same compile-time backtracking safety checks as greedy repetition. A `fewest` quantifier on a structurally ambiguous pattern still requires `!allow-backtracking = true`.
 
 ---
 
@@ -1019,6 +1061,7 @@ Tightest binding first:
 | `..` character range | `'a'..'z'` |
 | `excluding` set difference | `%Alpha excluding 'q'` |
 | `*` repetition | `%Digit * 4` |
+| `fewest` lazy modifier | `%Any * 1..? fewest` |
 | `as` capture | `%Digit * 4 as year` |
 | sequence (space) | `'hello' ' ' 'world'` |
 | `\|` alternation | `'cat' \| 'dog'` |

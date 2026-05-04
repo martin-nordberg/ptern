@@ -398,3 +398,31 @@ pub fn exclusion_interp_range_alts_probe_test() {
   source("rangeAlt = ('a'..'m' | 'n'..'z');\n%Alpha excluding {rangeAlt}")
   |> should.equal("[[A-Za-z]--[[a-m][n-z]]]")
 }
+
+// ---------------------------------------------------------------------------
+// Fewest (lazy quantifiers)
+// ---------------------------------------------------------------------------
+
+pub fn fewest_one_or_more_test() {
+  source("%Any * 1..? fewest") |> should.equal("[\\s\\S]+?")
+}
+
+pub fn fewest_zero_or_more_test() {
+  source("%Any * 0..? fewest") |> should.equal("[\\s\\S]*?")
+}
+
+pub fn fewest_optional_test() {
+  source("%Any * 0..1 fewest") |> should.equal("[\\s\\S]??")
+}
+
+pub fn fewest_bounded_test() {
+  source("%Any * 3..10 fewest") |> should.equal("[\\s\\S]{3,10}?")
+}
+
+pub fn fewest_at_least_n_test() {
+  source("%Any * 3..? fewest") |> should.equal("[\\s\\S]{3,}?")
+}
+
+pub fn greedy_remains_default_test() {
+  source("%Any * 1..?") |> should.equal("[\\s\\S]+")
+}
