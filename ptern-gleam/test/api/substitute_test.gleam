@@ -450,3 +450,67 @@ pub fn substitute_empty_array_element_ignore_matching_test() {
   )
   |> should.equal(Ok("13"))
 }
+
+// ---------------------------------------------------------------------------
+// Substitution — edge cases
+// ---------------------------------------------------------------------------
+
+pub fn substitute_alternation_literal_fallback_branch_test() {
+  let assert Ok(p) =
+    ptern.compile("!substitutable = true\n%Digit * 4 as year | 'unknown'")
+  ptern.substitute(p, dict.new())
+  |> should.equal(Ok("unknown"))
+}
+
+pub fn substitute_alternation_mismatch_propagates_immediately_test() {
+  let assert Ok(p) =
+    ptern.compile(
+      "!substitutable = true\n%Digit * 4 as year | %Alpha * 1..? as word",
+    )
+  ptern.substitute(
+    p,
+    dict.from_list([#("year", ptern.ScalarReplacement("abcd"))]),
+  )
+  |> should.equal(Error(ptern.CaptureMismatch("year", "abcd")))
+}
+
+pub fn substitute_missing_capture_falls_back_to_literal_inner_test() {
+  let assert Ok(p) =
+    ptern.compile("!substitutable = true\n'prefix-' 'X' as ver")
+  ptern.substitute(p, dict.new())
+  |> should.equal(Ok("prefix-X"))
+}
+
+pub fn substitute_bounded_rep_mismatched_array_lengths_test() {
+  let assert Ok(p) =
+    ptern.compile("!substitutable = true\n(%Digit as a %Alpha as b) * 1..3")
+  ptern.substitute(
+    p,
+    dict.from_list([
+      #("a", ptern.ArrayReplacement(["1", "2", "3"])),
+      #("b", ptern.ArrayReplacement(["x", "y"])),
+    ]),
+  )
+  |> should.equal(Error(ptern.ArrayLengthError("b", 2, 1, Some(3))))
+}
+
+pub fn substitute_scalar_for_bounded_rep_min_zero_gives_empty_test() {
+  let assert Ok(p) =
+    ptern.compile("!substitutable = true\n(%Digit as d) * 0..3")
+  ptern.substitute(p, dict.from_list([#("d", ptern.ScalarReplacement("5"))]))
+  |> should.equal(Ok(""))
+}
+
+pub fn substitute_three_branch_alternation_test() {
+  let assert Ok(p) =
+    ptern.compile(
+      "!substitutable = true\n%Digit * 4 as year | %Alpha * 1..? as word | 'fallback'",
+    )
+  ptern.substitute(
+    p,
+    dict.from_list([#("word", ptern.ScalarReplacement("hello"))]),
+  )
+  |> should.equal(Ok("hello"))
+  ptern.substitute(p, dict.new())
+  |> should.equal(Ok("fallback"))
+}

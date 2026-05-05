@@ -96,4 +96,4 @@ New semantic passes (e.g., a backtracking checker) belong between steps 4 and 5,
 - `MatchOccurrence` — `{ index, length, captures: Dict(String, String) }`
 - `ReplacementValue` — `ScalarReplacement(String) | ArrayReplacement(List(String))`
 - `ReplacementError` — `InvalidReplacementValue | WrongReplacementType | ArrayLengthMismatch | DuplicateRepetitionCapture`
-- `SubstitutionError` — `NotSubstitutable | MissingCapture | CaptureMismatch | WrongCaptureType | ArrayLengthError | NoMatchingBranch`
+- `SubstitutionError` — `NotSubstitutable | MissingCapture | CaptureMismatch | ArrayLengthError | NoMatchingBranch`

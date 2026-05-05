@@ -56,7 +56,6 @@ pub type SubstitutionError {
   NotSubstitutable
   MissingCapture(name: String)
   CaptureMismatch(name: String, value: String)
-  WrongCaptureType(name: String)
   ArrayLengthError(name: String, length: Int, min: Int, max: Option(Int))
   NoMatchingBranch
 }

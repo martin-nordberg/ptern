@@ -762,7 +762,6 @@ When the same capture name appears in both a non-repeated and a repeated positio
 | `NotSubstitutable`                      | `substitute()` called on a ptern without `!substitutable = true`        |
 | `MissingCapture(name)`                  | A required capture is absent and its expression is not substitutable    |
 | `CaptureMismatch(name, value)`          | `value` does not match the sub-pattern for `name`; only when `!substitutions-ignore-matching = false` |
-| `WrongCaptureType(name)`                | `string[]` provided where `string` is required, or vice versa           |
 | `ArrayLengthError(name, length, min, max)` | Array length outside the repetition bounds `[n, m]`, or two arrays within the same repetition differ in length |
 | `NoMatchingBranch`                      | All branches of an alternation fail                                     |
 
