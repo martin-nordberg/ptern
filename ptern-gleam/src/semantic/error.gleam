@@ -89,4 +89,8 @@ pub type SemanticError {
   /// `fewest` was applied to an exact-count repetition `* n`. The iteration
   /// count is fixed so there is no choice to minimise.
   FewestOnExactRepetition
+
+  /// A definition is declared but never referenced (directly or transitively)
+  /// from the body expression.
+  UnusedDefinition(name: String)
 }

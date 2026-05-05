@@ -454,8 +454,10 @@ pub fn parse_unclosed_group_test() {
 }
 
 pub fn parse_missing_semicolon_test() {
+  // Body "d = %Digit {d}" is parsed as definition body = sequence(%Digit, {d});
+  // the parser then expects ";" but reaches end of input.
   parse("d = %Digit {d}")
-  |> should.be_error()
+  |> should.equal(Error(UnexpectedToken(";", "end of input")))
 }
 
 pub fn parse_stray_token_test() {

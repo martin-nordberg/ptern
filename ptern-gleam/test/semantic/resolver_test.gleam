@@ -3,7 +3,7 @@ import lexer/lexer
 import parser/parser
 import semantic/error.{
   CaptureDefinitionConflict, CircularDefinition, DuplicateCapture,
-  DuplicateDefinition, UndefinedReference,
+  DuplicateDefinition, UndefinedReference, UnusedDefinition,
 }
 import semantic/resolver
 
@@ -145,4 +145,33 @@ pub fn multiple_errors_collected_test() {
   errs |> has_error(DuplicateDefinition("d")) |> should.be_true
   errs |> has_error(UndefinedReference("x")) |> should.be_true
   errs |> has_error(UndefinedReference("y")) |> should.be_true
+}
+
+// ---------------------------------------------------------------------------
+// Unused definitions
+// ---------------------------------------------------------------------------
+
+pub fn unused_definition_single_test() {
+  let errs = resolve("spare = 'x'; 'y'")
+  errs |> has_error(UnusedDefinition("spare")) |> should.be_true
+}
+
+pub fn unused_definition_two_defs_one_used_test() {
+  // `a` is referenced in the body; `b` is not.
+  let errs = resolve("a = 'x'; b = 'y'; {a}")
+  errs |> has_error(UnusedDefinition("b")) |> should.be_true
+  errs |> has_error(UnusedDefinition("a")) |> should.be_false
+}
+
+pub fn unused_definition_chain_neither_reachable_test() {
+  // `b` references `a`, but neither is used in the body.
+  let errs = resolve("a = 'x'; b = {a}; 'y'")
+  errs |> has_error(UnusedDefinition("a")) |> should.be_true
+  errs |> has_error(UnusedDefinition("b")) |> should.be_true
+}
+
+pub fn unused_definition_chain_transitively_reachable_test() {
+  // `b` is used in the body; `a` is only used by `b` — but that makes it live.
+  resolve("a = 'x'; b = {a} 'y'; {b}")
+  |> should.equal([])
 }

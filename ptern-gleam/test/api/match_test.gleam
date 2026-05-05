@@ -736,3 +736,135 @@ pub fn fewest_match_all_in_finds_each_tag_test() {
   let matches = ptern.match_all_in(lazy, "<b><i><em>")
   list.length(matches) |> should.equal(3)
 }
+
+// ---------------------------------------------------------------------------
+// Extended capture scenarios
+// ---------------------------------------------------------------------------
+
+// 1. Repetition capture: JS overwrites the named group on each iteration, so
+//    match_first_in returns the text from the last iteration.
+pub fn repetition_capture_value_is_last_iteration_test() {
+  let assert Ok(p) = ptern.compile("(%Digit * 4 as yr) * 3")
+  let assert Some(occ) = ptern.match_first_in(p, "202420252026")
+  dict.get(occ.captures, "yr") |> should.equal(Ok("2026"))
+}
+
+// 2. Optional capture (0..1) whose group did not participate: absent from dict.
+pub fn optional_capture_absent_when_not_matched_test() {
+  let assert Ok(p) = ptern.compile("('a' as opt) * 0..1")
+  // The pattern matches the empty string at index 0; opt did not participate.
+  let assert Some(occ) = ptern.match_first_in(p, "b")
+  dict.get(occ.captures, "opt") |> should.equal(Error(Nil))
+}
+
+// 3. Duplicate capture name: the compiler only emits a named group for the
+//    first occurrence, so match_first_in returns the first site's text.
+pub fn duplicate_capture_value_is_first_occurrence_test() {
+  let assert Ok(p) = ptern.compile("'a' as x '-' 'b' as x")
+  let assert Some(occ) = ptern.match_first_in(p, "a-b")
+  dict.get(occ.captures, "x") |> should.equal(Ok("a"))
+}
+
+// 4. Alternative branches: the capture from the branch that did NOT match is
+//    absent from the captures dict.
+pub fn alternative_branch_capture_absent_when_not_matched_test() {
+  let assert Ok(p) = ptern.compile("'a' as x | 'b' as y")
+  let assert Some(m1) = ptern.match_first_in(p, "a")
+  dict.get(m1.captures, "x") |> should.equal(Ok("a"))
+  dict.get(m1.captures, "y") |> should.equal(Error(Nil))
+  let assert Some(m2) = ptern.match_first_in(p, "b")
+  dict.get(m2.captures, "x") |> should.equal(Error(Nil))
+  dict.get(m2.captures, "y") |> should.equal(Ok("b"))
+}
+
+// 5. match_all_in: each occurrence carries its own independent captures dict.
+pub fn match_all_in_independent_captures_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 1..? as n")
+  let assert [first, second] = ptern.match_all_in(p, "42 and 7")
+  dict.get(first.captures, "n") |> should.equal(Ok("42"))
+  dict.get(second.captures, "n") |> should.equal(Ok("7"))
+}
+
+// 6. match_next_in: the returned occurrence carries the correct captures.
+pub fn match_next_in_captures_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 1..? as n")
+  let assert Some(first) = ptern.match_next_in(p, "42 and 7", 0)
+  dict.get(first.captures, "n") |> should.equal(Ok("42"))
+  let assert Some(second) =
+    ptern.match_next_in(p, "42 and 7", first.index + first.length)
+  dict.get(second.captures, "n") |> should.equal(Ok("7"))
+}
+
+// 7. Internal __rep_N synthetic groups must not surface in user-facing captures.
+pub fn repetition_synthetic_group_not_in_captures_test() {
+  let assert Ok(p) = ptern.compile("(%Digit as d) * 3")
+  let assert Some(occ) = ptern.match_first_in(p, "123")
+  dict.get(occ.captures, "__rep_0") |> should.equal(Error(Nil))
+}
+
+// 8. Case-insensitive flag propagates to backreferences.
+pub fn backreference_case_insensitive_with_flag_test() {
+  let assert Ok(p) =
+    ptern.compile("!case-insensitive = true\n%Alpha * 1..? as word ' ' {word}")
+  ptern.matches_all_of(p, "Hello hello") |> should.be_true
+  ptern.matches_all_of(p, "Hello HELLO") |> should.be_true
+  ptern.matches_all_of(p, "Hello world") |> should.be_false
+}
+
+// ---------------------------------------------------------------------------
+// Sub-pattern scenarios
+// ---------------------------------------------------------------------------
+
+// 1. Same definition interpolated twice: both uses expand independently at runtime.
+pub fn definition_interpolated_twice_matches_test() {
+  let assert Ok(p) = ptern.compile("d = %Digit * 4; {d} '-' {d}")
+  ptern.matches_all_of(p, "2024-2026") |> should.be_true
+  ptern.matches_all_of(p, "2024-202") |> should.be_false
+}
+
+// 2. Definition used as the base of a repetition.
+pub fn definition_inside_repetition_matches_test() {
+  let assert Ok(p) = ptern.compile("seg = %Digit * 2; {seg} * 3")
+  ptern.matches_all_of(p, "123456") |> should.be_true
+  ptern.matches_all_of(p, "12345") |> should.be_false
+}
+
+// 3. Definition body that is itself an alternation.
+pub fn definition_body_alternation_matches_test() {
+  let assert Ok(p) = ptern.compile("sep = ',' | ';'; %Digit {sep} %Digit")
+  ptern.matches_all_of(p, "1,2") |> should.be_true
+  ptern.matches_all_of(p, "1;2") |> should.be_true
+  ptern.matches_all_of(p, "1|2") |> should.be_false
+}
+
+// 4. Three-node circular definition: a → b → c → a.
+pub fn circular_definition_three_node_test() {
+  ptern.compile("a = {b}; b = {c}; c = {a}; {a}")
+  |> has_semantic_error(error.CircularDefinition(["a", "b", "c"]))
+  |> should.be_true
+}
+
+// 5. An unused definition is a semantic error.
+pub fn unused_definition_error_test() {
+  ptern.compile("spare = 'x'; 'y'")
+  |> has_semantic_error(error.UnusedDefinition("spare"))
+  |> should.be_true
+}
+
+// 6. Backreference after a definition-interpolation capture: {num} as tag ':' {tag}.
+//    The second {tag} is a backreference, not another interpolation of `num`.
+pub fn backreference_after_definition_capture_matches_test() {
+  let assert Ok(p) =
+    ptern.compile("num = %Digit * 1..3; {num} as tag ':' {tag}")
+  ptern.matches_all_of(p, "42:42") |> should.be_true
+  ptern.matches_all_of(p, "42:43") |> should.be_false
+  let assert Some(occ) = ptern.match_first_in(p, "99:99 rest")
+  dict.get(occ.captures, "tag") |> should.equal(Ok("99"))
+}
+
+// 7. Three-level definition chain: a → b → c, each expanding through the previous.
+pub fn definition_chain_three_levels_matches_test() {
+  let assert Ok(p) = ptern.compile("a = 'x'; b = {a} 'y'; c = {b} 'z'; {c}")
+  ptern.matches_all_of(p, "xyz") |> should.be_true
+  ptern.matches_all_of(p, "xy") |> should.be_false
+}

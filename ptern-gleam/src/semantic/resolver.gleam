@@ -10,7 +10,7 @@ import parser/ast.{
 }
 import semantic/error.{
   type SemanticError, CaptureDefinitionConflict, CircularDefinition,
-  DuplicateCapture, DuplicateDefinition, UndefinedReference,
+  DuplicateCapture, DuplicateDefinition, UndefinedReference, UnusedDefinition,
 }
 
 /// Run all name-resolution checks on a parsed Ptern, returning every error
@@ -51,6 +51,10 @@ pub fn resolve(ptern: ParsedPtern) -> List(SemanticError) {
   let body_ref_errs =
     check_undefined_refs(ptern.body, def_names, body_cap_names)
 
+  // 9. Flag definitions that are never reachable from the body expression.
+  let unused_errs =
+    find_unused_definitions(ptern.definitions, def_names, ptern.body)
+
   list.flatten([
     dup_def_errs,
     circ_errs,
@@ -58,6 +62,7 @@ pub fn resolve(ptern: ParsedPtern) -> List(SemanticError) {
     dup_cap_errs,
     conflict_errs,
     body_ref_errs,
+    unused_errs,
   ])
 }
 
@@ -121,6 +126,59 @@ fn take_until_inclusive(lst: List(String), target: String) -> List(String) {
       case x == target {
         True -> [x]
         False -> [x, ..take_until_inclusive(rest, target)]
+      }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Unused definition detection
+// ---------------------------------------------------------------------------
+
+fn find_unused_definitions(
+  defs: List(Definition),
+  def_names: List(String),
+  body: Expression,
+) -> List(SemanticError) {
+  // Build def → referenced-def-names graph (same shape as circular detection).
+  let graph =
+    list.fold(defs, dict.new(), fn(g, def) {
+      let deps =
+        interpolations_in_expression(def.body)
+        |> list.filter(fn(d) { list.contains(def_names, d) })
+      dict.insert(g, def.name, deps)
+    })
+
+  // Seed the reachable set from definition names directly used in the body.
+  let seeds =
+    interpolations_in_expression(body)
+    |> list.filter(fn(n) { list.contains(def_names, n) })
+
+  let reachable = expand_reachable(graph, seeds, [])
+
+  list.filter_map(def_names, fn(name) {
+    case list.contains(reachable, name) {
+      True -> Error(Nil)
+      False -> Ok(UnusedDefinition(name))
+    }
+  })
+}
+
+// BFS/DFS over the graph to collect all names reachable from `frontier`,
+// avoiding revisits via `visited`.
+fn expand_reachable(
+  graph: Dict(String, List(String)),
+  frontier: List(String),
+  visited: List(String),
+) -> List(String) {
+  case frontier {
+    [] -> visited
+    [name, ..rest] ->
+      case list.contains(visited, name) {
+        True -> expand_reachable(graph, rest, visited)
+        False -> {
+          let deps = result.unwrap(dict.get(graph, name), [])
+          expand_reachable(graph, list.append(deps, rest), [name, ..visited])
+        }
       }
   }
 }

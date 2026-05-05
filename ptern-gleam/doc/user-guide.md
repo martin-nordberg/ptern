@@ -488,6 +488,8 @@ let assert Ok(iso_date) = ptern.compile(
 
 Each definition is `name = pattern ;`. The final line (no semicolon) is the body expression that actually matches. Definitions may reference other definitions.
 
+Every definition must be used — if a definition's name never appears in a `{name}` that is reachable (directly or through other definitions) from the body expression, the pattern fails to compile with an `UnusedDefinition` error. This catches dead code early and keeps patterns free of stale definitions.
+
 Definitions make the individual pieces testable in isolation and make the body readable at a glance. Compare the body to its equivalent regex fragment — `(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])` — and the ptern wins on readability every time.
 
 ### Interpolation vs. backreference

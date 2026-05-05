@@ -375,6 +375,8 @@ Note: ptern's static analysis is structural — it only catches cases where the 
 
 **Definitions reference only definitions** — Inside a definition body, `{identifier}` may only reference other definition names, not capture names from the body expression.
 
+**All definitions must be used** — Every definition must be reachable, directly or transitively, from the body expression. A definition whose name never appears — directly or through a chain of other definitions — in any `{name}` reachable from the body is a compile-time error: `UnusedDefinition(name)`. Transitive reachability applies: if `b` is used in the body and `b`'s body references `a`, then `a` is considered used. Two definitions that reference each other but neither is reachable from the body are both flagged independently.
+
 ### 7.6 Name Resolution Constraints
 
 **No undefined references** — `{identifier}` in the body expression where `identifier` is neither a definition name nor a capture name already established earlier in the body is an error.
