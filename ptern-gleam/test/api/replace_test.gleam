@@ -448,3 +448,179 @@ pub fn round_trip_repetition_capture_broadcasts_last_value_test() {
   ptern.replace_first_in(p, input, as_replacements(occ.captures))
   |> should.equal(Ok("202620262026"))
 }
+
+// ---------------------------------------------------------------------------
+// 1. Duplicate capture name — only the first occurrence is patched
+// ---------------------------------------------------------------------------
+
+// The compiler suppresses the second named group for "x" to satisfy JS regex.
+// Only the first occurrence's span exists in m.indices.groups, so only that
+// span is patched; the second matched text keeps its original value.
+pub fn replace_duplicate_capture_patches_first_occurrence_only_test() {
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n'foo' as x '-' 'bar' as x")
+  ptern.replace_first_in(
+    p,
+    "foo-bar",
+    dict.from_list([#("x", ptern.ScalarReplacement("Z"))]),
+  )
+  |> should.equal(Ok("Z-bar"))
+}
+
+// ---------------------------------------------------------------------------
+// 2. Array element fails validation (default matching mode)
+// ---------------------------------------------------------------------------
+
+pub fn array_element_fails_validation_test() {
+  let assert Ok(p) = ptern.compile("(%Digit * 2 as n) * 3")
+  ptern.replace_first_in(
+    p,
+    "121314",
+    dict.from_list([#("n", ptern.ArrayReplacement(["12", "ab", "34"]))]),
+  )
+  |> should.equal(Error(ptern.InvalidReplacementValue("n", "ab")))
+}
+
+// ---------------------------------------------------------------------------
+// 3. Scalar broadcast with validation active
+// ---------------------------------------------------------------------------
+
+pub fn scalar_broadcast_with_validation_valid_test() {
+  let assert Ok(p) = ptern.compile("(%Digit * 2 as n) * 3")
+  ptern.replace_all_of(
+    p,
+    "121314",
+    dict.from_list([#("n", ptern.ScalarReplacement("99"))]),
+  )
+  |> should.equal(Ok("999999"))
+}
+
+pub fn scalar_broadcast_with_validation_invalid_test() {
+  let assert Ok(p) = ptern.compile("(%Digit * 2 as n) * 3")
+  ptern.replace_all_of(
+    p,
+    "121314",
+    dict.from_list([#("n", ptern.ScalarReplacement("ab"))]),
+  )
+  |> should.equal(Error(ptern.InvalidReplacementValue("n", "ab")))
+}
+
+// ---------------------------------------------------------------------------
+// 4. Mixed repeated and non-repeated captures in the same replacement
+// ---------------------------------------------------------------------------
+
+pub fn mixed_repeated_and_scalar_captures_test() {
+  let assert Ok(p) =
+    ptern.compile(
+      "!replacements-ignore-matching = true\n%Alpha * 1..? as tag ('-' %Digit * 2 as n) * 1..3",
+    )
+  ptern.replace_first_in(
+    p,
+    "abc-12-34",
+    dict.from_list([
+      #("tag", ptern.ScalarReplacement("Z")),
+      #("n", ptern.ArrayReplacement(["01", "02"])),
+    ]),
+  )
+  |> should.equal(Ok("Z-01-02"))
+}
+
+// ---------------------------------------------------------------------------
+// 5. Bounded repetition — array length at exact min and max boundaries
+// ---------------------------------------------------------------------------
+
+pub fn bounded_rep_array_at_min_boundary_test() {
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n(%Digit * 2 as n) * 2..4")
+  ptern.replace_first_in(
+    p,
+    "1234",
+    dict.from_list([#("n", ptern.ArrayReplacement(["X", "Y"]))]),
+  )
+  |> should.equal(Ok("XY"))
+}
+
+pub fn bounded_rep_array_at_max_boundary_test() {
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n(%Digit * 2 as n) * 2..4")
+  ptern.replace_first_in(
+    p,
+    "12345678",
+    dict.from_list([#("n", ptern.ArrayReplacement(["A", "B", "C", "D"]))]),
+  )
+  |> should.equal(Ok("ABCD"))
+}
+
+pub fn bounded_rep_array_length_mismatch_test() {
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n(%Digit * 2 as n) * 2..4")
+  ptern.replace_first_in(
+    p,
+    "1234",
+    dict.from_list([#("n", ptern.ArrayReplacement(["X"]))]),
+  )
+  |> should.equal(Error(ptern.ArrayLengthMismatch("n", 1, 2)))
+}
+
+// ---------------------------------------------------------------------------
+// 6. Empty replacements dict — captured spans left unchanged
+// ---------------------------------------------------------------------------
+
+pub fn empty_replacements_dict_leaves_match_unchanged_test() {
+  let assert Ok(p) = ptern.compile("%Digit * 4 as year")
+  ptern.replace_first_in(p, "event 2026", dict.new())
+  |> should.equal(Ok("event 2026"))
+}
+
+// ---------------------------------------------------------------------------
+// 7. replace_next_in at offset 0 finds the first occurrence
+// ---------------------------------------------------------------------------
+
+pub fn replace_next_in_at_offset_zero_matches_first_occurrence_test() {
+  let assert Ok(p) =
+    ptern.compile("!replacements-ignore-matching = true\n%Digit * 4 as year")
+  ptern.replace_next_in(
+    p,
+    "2026 and 2025",
+    0,
+    dict.from_list([#("year", ptern.ScalarReplacement("YYYY"))]),
+  )
+  |> should.equal(Ok("YYYY and 2025"))
+}
+
+// ---------------------------------------------------------------------------
+// 8. Case-insensitive — uppercase match text is replaced correctly
+// ---------------------------------------------------------------------------
+
+pub fn case_insensitive_replaces_uppercase_match_test() {
+  let assert Ok(p) =
+    ptern.compile(
+      "!case-insensitive = true\n!replacements-ignore-matching = true\n'hello' as word",
+    )
+  ptern.replace_first_in(
+    p,
+    "HELLO world",
+    dict.from_list([#("word", ptern.ScalarReplacement("greetings"))]),
+  )
+  |> should.equal(Ok("greetings world"))
+}
+
+// ---------------------------------------------------------------------------
+// 9. Backreference — only the original capture span is patched
+// ---------------------------------------------------------------------------
+
+// {tag} is a regex backreference (\k<tag>), not a named group.
+// Only the first capture span is in m.indices.groups; the backreference
+// position retains its original matched text.
+pub fn replace_backreference_only_patches_capture_span_test() {
+  let assert Ok(p) =
+    ptern.compile(
+      "!replacements-ignore-matching = true\n%Alpha * 3 as tag ',' {tag}",
+    )
+  ptern.replace_first_in(
+    p,
+    "abc,abc",
+    dict.from_list([#("tag", ptern.ScalarReplacement("xyz"))]),
+  )
+  |> should.equal(Ok("xyz,abc"))
+}
