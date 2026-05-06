@@ -1,95 +1,201 @@
-# Ptern Automated Formatting
+# Ptern Source Formatting Specification
 
-Provide a na API within Ptern to reformat the source code of a ptern.
+**Version:** 0.1 (Draft)  
+**Date:** 2026-05-06
 
-* Public API:
-  
-    `pub fn format(source: String, options: Dict) -> Result(String, FormatError);`
+---
 
-* Options:
+## 1. Introduction
 
-  - lineWidth - integer >= 40 - the target maximum line width for the output; default = 80
-  - compact - boolean - if true format with less whitespace; default = false
-  - aligned - boolean - if true, vertically align '=' in annotations and definitions; default = true
+This document specifies the `format` operation, which accepts a Ptern source string and returns a canonically formatted version of that source. The formatted output is syntactically and semantically equivalent to the input: it produces the same compiled pattern and captures the same language. Comments are not preserved.
 
-Below is a procedural definition of how code is to be formatted:
+The formatter operates on the parse tree produced by the Ptern lexer and parser. It does not require a semantically valid ptern; semantic errors (undefined references, circular definitions, etc.) do not prevent formatting. Only lex and parse errors cause `format` to fail.
 
-## Errors
+---
 
-Check whether the ptern compiles. If there are syntax errors (i.e. no valid AST), then stop
-and return the same error as compile(..).
+## 2. Public API
 
-## Overall Layout
+### 2.1 Types
 
-Organize the code as follows:
+```gleam
+pub type FormatOptions {
+  FormatOptions(
+    line_width: Int,
+    compact: Bool,
+    aligned: Bool,
+    reordered: Bool,
+  )
+}
 
-  - (No leading blank lines)
-  - Annotations in alphabteical order, one per line
-  - One blank line if there are annotations
-  - Definitions in their original order, one per line
-  - One blank line if there are definitions
-  - The final pattern all on one line
-  - (No trailing blank lines)
+pub fn default_format_options() -> FormatOptions {
+  FormatOptions(line_width: 80, compact: False, aligned: True, reordered: False)
+}
 
-## Whitespace
+pub type FormatError {
+  FormatLexError(LexError)
+  FormatParseError(ParseError)
+  InvalidLineWidth
+}
 
-1. Use no tab characters; replace tabs with spaces.
+pub fn format(source: String, options: FormatOptions) -> Result(String, FormatError)
+```
 
-2. Shrink all whitespace to at most one space character except for the alignment whitespace
-   noted below.
+### 2.2 Options
 
-3. Include space characters as follows:
-|Case|compact = false|compact = true|
-|----|---------------|--------------|
-|Before and after '..'|0|0|
-|Before and after '*'|1|0|
-|Before and after '\|'|1|0|
-|After '('|1|0|
-|Before ')'|1|0|
-|Before and after any keyword|1|1|
+| Option | Type | Default | Constraint | Description |
+|--------|------|---------|------------|-------------|
+| `line_width` | `Int` | `80` | `>= 40` | Target maximum column width. Lines may exceed this width when no valid break point exists within the limit. |
+| `compact` | `Bool` | `False` | — | When `True`, omit optional whitespace around operators and suppress blank separator lines between sections. |
+| `aligned` | `Bool` | `True` | — | When `True`, vertically align `=` signs within the annotation block and within the definition block independently. `compact` does not override this option. |
+| `reordered` | `Bool` | `False` | — | When `True`, sort definitions into topological layers (dependencies before dependents) and then alphabetically within each layer. See §5.1. |
 
-The compact option does not affect whitespace around '='; only the aligned option has an effect.
+If `line_width < 40`, `format` returns `Error(InvalidLineWidth)` without further processing.
 
-|Case     |aligned=false|aligned=true|
-|---------|-------------|------------|
-|Before '='|1|Enough space characters to vertically align all annotations or all definitions (not both) such that the longest annotation name or definition name is followed by one space character.|
-|After '='|1|1|
+---
 
-   
-## Line Breaks
+## 3. Error Handling
 
-### Annotations
+`format` first lexes and parses the source string. If lexing or parsing fails, `format` returns the corresponding `FormatLexError` or `FormatParseError` and produces no output. Semantic errors discovered by the validator or resolver (§7 of the language specification) do not cause `format` to fail; the formatter operates solely on the parse tree.
 
-1. Always leave each annotation all on one line. It should not be possible for an annotation to exceed the minimum allowed target line width of 40.
+---
 
-2. If compact = false, put one blank line after the annotations, if there are any. If compact = true
-add no such separator line.
+## 4. Comments
 
-### Definitions
+Comments (from `#` to end of line) are not present in the parse tree and are therefore not present in the formatted output. This is an intentional consequence of formatting: the canonical form of a ptern contains no comments.
 
-1. If the whole line is longer than lineWidth and the trimmed text to the right of '=' is less than
-   lineWidth - 4, then put a line break after '=' and indent the remainder by 4 spaces.
+---
 
-2. If a definition line remains longer than lineWidth, replace the rightmost mandatory whitespace
-   that occurs within the first lineWidth+1 characters with a line break. Indent the remainder after
-   the break such that it starts vertically aligned with the text after ' = ' just above.
+## 5. Overall Structure
 
-3. If a definition line starts with an alternation and cannot be broken by mandatory whitespace
-   as above, then put a line break before the rightmost '|' of the same alternation that falls
-   in the first lineWidth+1 characters. Indent the
-   remainder so that the '|' aligns with '(' or '|' of the preceding line.
+The formatted output consists of the following sections in order, with no leading or trailing blank lines in the output as a whole:
 
-4. If none of the above rules applies, leave the line longer than the target width.
+1. **Annotation block** — zero or more annotation lines, sorted lexicographically by annotation name.
+2. **Blank separator** — exactly one blank line, present if and only if both the annotation block and at least one subsequent section are non-empty, and `compact = False`.
+3. **Definition block** — zero or more definition lines, ordered as specified in §5.1.
+4. **Blank separator** — exactly one blank line, present if and only if both the definition block and the body expression section are non-empty, and `compact = False`.
+5. **Body expression** — the body expression, which occupies one or more lines.
 
-5. If compact = false, put one blank line after the definitions, if there are any. If compact = true
-add no such separator line.
+### 5.1 Definition Ordering
 
-### Final Pattern
+When `reordered = False` (the default), definitions are emitted in the order they appear in the source.
 
-1. If a pattern line remains longer than lineWidth, replace the rightmost mandatory whitespace
-   that occurs within the first lineWidth+1 characters with a line break. Do not indent the
-   remainder on the next the line.
+When `reordered = True`, definitions are sorted as follows:
 
-2. If a pattern line starts with an alternation and cannot be broken by mandatory whitespace
-   as above, then put a line break before the rightmost '|' of the same alternation that falls
-   in the first lineWidth+1 characters. Do not indent the remainder on the next line.
+1. **Build the dependency graph.** For each definition *D*, its direct dependencies are the set of identifiers referenced via `{ identifier }` interpolations in its body, restricted to identifiers that are themselves defined as definitions in the same ptern.
+
+2. **Assign layers.** Each definition is assigned a non-negative integer layer number:
+   - A definition with no dependencies is in layer 0.
+   - A definition whose direct dependencies are all in layers 0..*k*−1 is in layer *k*.
+   - Equivalently: layer(*D*) = 0 if *D* has no dependencies; otherwise layer(*D*) = 1 + max(layer(*dep*)) over all direct dependencies of *D*.
+
+3. **Handle cycles.** If the dependency graph contains a cycle, the definitions involved in that cycle cannot be assigned a layer by the above rule. Such definitions are collected and placed after all successfully layered definitions, in their original source order relative to one another. (Cyclic definitions constitute a semantic error that the validator will report; the formatter emits them without reordering to preserve the source faithfully.)
+
+4. **Emit.** Emit definitions in ascending layer order. Within each layer, sort definitions alphabetically by identifier name (Unicode code-point order, i.e., lexicographic on UTF-16 code units, consistent with the JavaScript `<` operator on strings).
+
+---
+
+## 6. Whitespace Rules
+
+### 6.1 General Rules
+
+1. Tab characters (`U+0009`) are not produced in the formatted output.
+2. Trailing whitespace is not produced on any output line.
+3. Multiple consecutive space characters are reduced to a single space, except for alignment padding (§6.3) and continuation indentation (§8.2, §8.3).
+
+### 6.2 Operator Spacing
+
+The following table specifies the number of space characters placed immediately before and after each token. "Before" means between the preceding token and this one; "after" means between this token and the following token.
+
+| Context | `compact = False` | `compact = True` |
+|---------|-------------------|------------------|
+| Before and after `..` | 0 | 0 |
+| Before and after `*` | 1 | 0 |
+| Before and after `\|` | 1 | 0 |
+| After `(` | 1 | 0 |
+| Before `)` | 1 | 0 |
+| Before and after any keyword (`as`, `excluding`) | 1 | 1 |
+
+The `compact` option does not affect spacing around `=`; only the `aligned` option governs that (§6.3).
+
+### 6.3 Alignment of `=`
+
+The `=` token appears in annotations (e.g., `!case-insensitive = true`) and in subpattern definitions (e.g., `word = %Alpha * 1..? ;`).
+
+| Context | `aligned = False` | `aligned = True` |
+|---------|-------------------|------------------|
+| Before `=` | 1 space | Padded to column *C* (see below) |
+| After `=` | 1 space | 1 space |
+
+When `aligned = True`, the alignment column *C* is computed separately for the annotation block and for the definition block:
+
+> *C* = (length of the longest name in the block) + 2
+
+where "name" is the annotation name (the part after `!`) or the definition identifier, and the +2 accounts for the `!` or bare identifier character sequence plus one mandatory trailing space. Every `=` in the block is then placed at column *C*.
+
+Alignment padding applies only to the first line of a definition. Continuation lines of wrapped definitions (§8.2) use continuation indentation instead and do not affect or participate in alignment.
+
+---
+
+## 7. Token Representation
+
+### 7.1 String Literals
+
+String literals are normalized to single-quote delimiters (`'...'`) regardless of the delimiter used in the source. If the literal content contains one or more single-quote characters (`U+0027`), double-quote delimiters (`"..."`) are used instead, since switching to single quotes would require adding escape sequences. No other normalization of literal content is performed.
+
+### 7.2 Character Classes
+
+Character class names are reproduced in the canonical title case defined in §5 of the language specification (e.g., `%Alpha`, `%Digit`, `%Any`).
+
+### 7.3 Annotations
+
+Annotations are reproduced in the form `!name` or `!name = value` as appropriate, using exactly one space before and after `=` when a value is present (subject to §6.3).
+
+---
+
+## 8. Line Breaking
+
+### 8.1 Definitions of Terms
+
+**Mandatory whitespace position**: A position in the token sequence where a space character is emitted in the formatted output because the grammar requires separation between two tokens (i.e., sequence-separating space, and spaces around operators specified in §6.2 with a non-zero count). Positions that emit zero spaces (e.g., before/after `..`) are not mandatory whitespace positions.
+
+**Line length**: The number of characters on a line, not counting the line terminator.
+
+**Break point**: A mandatory whitespace position at which a line break may be inserted. A line break at a break point replaces the space character(s) at that position with a newline.
+
+### 8.2 Definition Lines
+
+Each definition is initially formatted as a single line: `name = body ;` (with spacing per §6.2–§6.3). The following rules are applied in order to bring the line within `line_width`.
+
+**Rule D1 — Break after `=`:** If the line length exceeds `line_width` and the length of the body text (the content after `= ` up to and including ` ;`) is at most `line_width − 4`, insert a line break after `=` and indent the body by 4 spaces. The closing `;` appears on the same line as the body text.
+
+**Rule D2 — Break at rightmost sequence position:** If the line (or the body line after D1) still exceeds `line_width`, find the rightmost mandatory whitespace position that is a sequence-separating space and falls within the first `line_width + 1` characters of the line. Insert a line break at that position. Indent the continuation line to align with the first non-space character of the body on the line above (i.e., the character immediately following `= ` on the first line of the definition, or the indentation established by a previous break).
+
+Rule D2 may be applied repeatedly: after each break, the new continuation line is tested against `line_width` and broken again if necessary, using the same continuation indentation column.
+
+**Rule D3 — Break before alternation `|`:** If the line still exceeds `line_width` after D2 and the body is an alternation, find the rightmost `|` that (a) belongs to the outermost alternation level and (b) falls within the first `line_width + 1` characters of the line. Insert a line break immediately before that `|`. Indent the continuation line so that the `|` aligns with the `(` or `|` that opens the enclosing alternation on the preceding line.
+
+**Rule D4 — No break available:** If none of D1–D3 produces a line within `line_width`, the line is emitted at its natural length without further modification.
+
+### 8.3 Body Expression Lines
+
+The body expression is formatted as a single line and then broken using the following rules, applied in order.
+
+**Rule B1 — Break at rightmost sequence position:** If the line exceeds `line_width`, find the rightmost mandatory whitespace position that is a sequence-separating space and falls within the first `line_width + 1` characters of the line. Insert a line break at that position. Continuation lines are not indented (column 0).
+
+Rule B1 may be applied repeatedly to continuation lines under the same conditions.
+
+**Rule B2 — Break before alternation `|`:** If the line still exceeds `line_width` and the body is an alternation, find the rightmost `|` that (a) belongs to the outermost alternation level and (b) falls within the first `line_width + 1` characters of the line. Insert a line break immediately before that `|`. Continuation lines are not indented (column 0).
+
+**Rule B3 — No break available:** If neither B1 nor B2 produces a line within `line_width`, the line is emitted at its natural length without further modification.
+
+### 8.4 Annotations
+
+Annotations are never broken across lines. An annotation that exceeds `line_width` is emitted on a single line. Because the minimum valid `line_width` is 40 (§2.2) and annotation lines cannot exceed the length of a valid annotation token, this condition is not expected to arise in practice.
+
+---
+
+## 9. Open Questions
+
+The following questions are not resolved by this version of the specification and must be addressed before implementation:
+
+1. **Comment preservation** — should an option be provided to round-trip comments, associating each comment with the nearest following syntactic element so it can be re-emitted in the formatted output?
