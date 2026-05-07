@@ -2,9 +2,10 @@ import gleeunit/should
 import lexer/lexer
 import lexer/token.{
   As, Asterisk, Bang, CharacterClass, Comment, DoubleQuotedLiteral, Equals,
-  Excluding, FalseKeyword, Fewest, Identifier, Integer, LeftBrace, LeftParen,
-  AlternativeOperator, QuestionMark, RangeOperator, RightBrace, RightParen,
-  Semicolon, SingleQuotedLiteral, TrueKeyword, Whitespace,
+  Excluding, FalseKeyword, Fewest, Identifier, InlineComment, Integer,
+  LeftBrace, LeftParen, AlternativeOperator, QuestionMark, RangeOperator,
+  RightBrace, RightParen, Semicolon, SingleQuotedLiteral, TrueKeyword,
+  Whitespace,
 }
 
 pub fn lex_empty_test() {
@@ -119,13 +120,17 @@ pub fn lex_identifier_test() {
 
 pub fn lex_whitespace_collapses_run_test() {
   lexer.lex("a   b")
-  |> should.equal(Ok([Identifier("a"), Whitespace, Identifier("b")]))
+  |> should.equal(Ok([Identifier("a"), Whitespace(False), Identifier("b")]))
 }
+
+// ---------------------------------------------------------------------------
+// Comments
+// ---------------------------------------------------------------------------
 
 pub fn lex_comment_test() {
   lexer.lex("# a comment\n'x'")
   |> should.equal(
-    Ok([Comment(" a comment"), Whitespace, SingleQuotedLiteral("x")]),
+    Ok([Comment(" a comment"), Whitespace(False), SingleQuotedLiteral("x")]),
   )
 }
 
@@ -134,10 +139,69 @@ pub fn lex_comment_at_end_of_input_test() {
   |> should.equal(Ok([Comment(" no newline")]))
 }
 
+pub fn lex_inline_comment_is_error_test() {
+  lexer.lex("'x' # inline comment")
+  |> should.equal(Error(InlineComment))
+}
+
+pub fn lex_inline_comment_mid_expression_is_error_test() {
+  lexer.lex("%Digit # not allowed here")
+  |> should.equal(Error(InlineComment))
+}
+
+// ---------------------------------------------------------------------------
+// Whitespace blank-line detection
+// ---------------------------------------------------------------------------
+
+pub fn lex_single_newline_has_no_blank_line_test() {
+  lexer.lex("'a'\n'b'")
+  |> should.equal(
+    Ok([SingleQuotedLiteral("a"), Whitespace(False), SingleQuotedLiteral("b")]),
+  )
+}
+
+pub fn lex_blank_line_sets_has_blank_line_test() {
+  lexer.lex("'a'\n\n'b'")
+  |> should.equal(
+    Ok([SingleQuotedLiteral("a"), Whitespace(True), SingleQuotedLiteral("b")]),
+  )
+}
+
+pub fn lex_blank_line_with_spaces_sets_has_blank_line_test() {
+  lexer.lex("'a'\n   \n'b'")
+  |> should.equal(
+    Ok([SingleQuotedLiteral("a"), Whitespace(True), SingleQuotedLiteral("b")]),
+  )
+}
+
+pub fn lex_comment_at_start_of_file_test() {
+  lexer.lex("# ptern doc\n'x'")
+  |> should.equal(
+    Ok([Comment(" ptern doc"), Whitespace(False), SingleQuotedLiteral("x")]),
+  )
+}
+
+pub fn lex_comment_after_blank_line_at_top_test() {
+  lexer.lex("# ptern doc\n\n'x'")
+  |> should.equal(
+    Ok([Comment(" ptern doc"), Whitespace(True), SingleQuotedLiteral("x")]),
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Existing token tests
+// ---------------------------------------------------------------------------
+
 pub fn lex_repetition_expression_test() {
   lexer.lex("%Digit * 4")
   |> should.equal(
-    Ok([CharacterClass("Digit"), Whitespace, Asterisk, Whitespace, Integer(4)]),
+    Ok([
+      CharacterClass("Digit"),
+      Whitespace(False),
+      Asterisk,
+      Whitespace(False),
+      Integer(4),
+    ]),
   )
 }
 
@@ -151,9 +215,9 @@ pub fn lex_unbounded_repetition_test() {
   |> should.equal(
     Ok([
       CharacterClass("Digit"),
-      Whitespace,
+      Whitespace(False),
       Asterisk,
-      Whitespace,
+      Whitespace(False),
       Integer(1),
       RangeOperator,
       QuestionMark,
@@ -166,9 +230,9 @@ pub fn lex_bounded_repetition_test() {
   |> should.equal(
     Ok([
       SingleQuotedLiteral("*"),
-      Whitespace,
+      Whitespace(False),
       Asterisk,
-      Whitespace,
+      Whitespace(False),
       Integer(3),
       RangeOperator,
       Integer(10),
@@ -183,96 +247,97 @@ pub fn lex_iso_date_pattern_test() {
   lexer.lex(input)
   |> should.equal(
     Ok([
+      // leading newline + spaces
+      Whitespace(False),
       // yyyy = %Digit * 4;
-      Whitespace,
       Identifier("yyyy"),
-      Whitespace,
+      Whitespace(False),
       Equals,
-      Whitespace,
+      Whitespace(False),
       CharacterClass("Digit"),
-      Whitespace,
+      Whitespace(False),
       Asterisk,
-      Whitespace,
+      Whitespace(False),
       Integer(4),
       Semicolon,
       // mm = '0' '1'..'9' | '1' '0'..'2';
-      Whitespace,
+      Whitespace(False),
       Identifier("mm"),
-      Whitespace,
+      Whitespace(False),
       Equals,
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("0"),
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("1"),
       RangeOperator,
       SingleQuotedLiteral("9"),
-      Whitespace,
+      Whitespace(False),
       AlternativeOperator,
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("1"),
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("0"),
       RangeOperator,
       SingleQuotedLiteral("2"),
       Semicolon,
-      // dd = '0' '1'..'9' | '1'..'2' %Digit | '3' '0'..'1';
-      Whitespace,
+      // dd = ...
+      Whitespace(False),
       Identifier("dd"),
-      Whitespace,
+      Whitespace(False),
       Equals,
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("0"),
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("1"),
       RangeOperator,
       SingleQuotedLiteral("9"),
-      Whitespace,
+      Whitespace(False),
       AlternativeOperator,
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("1"),
       RangeOperator,
       SingleQuotedLiteral("2"),
-      Whitespace,
+      Whitespace(False),
       CharacterClass("Digit"),
-      Whitespace,
+      Whitespace(False),
       AlternativeOperator,
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("3"),
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("0"),
       RangeOperator,
       SingleQuotedLiteral("1"),
       Semicolon,
       // {yyyy} as year '-' {mm} as month '-' {dd} as day
-      Whitespace,
+      Whitespace(False),
       LeftBrace,
       Identifier("yyyy"),
       RightBrace,
-      Whitespace,
+      Whitespace(False),
       As,
-      Whitespace,
+      Whitespace(False),
       Identifier("year"),
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("-"),
-      Whitespace,
+      Whitespace(False),
       LeftBrace,
       Identifier("mm"),
       RightBrace,
-      Whitespace,
+      Whitespace(False),
       As,
-      Whitespace,
+      Whitespace(False),
       Identifier("month"),
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("-"),
-      Whitespace,
+      Whitespace(False),
       LeftBrace,
       Identifier("dd"),
       RightBrace,
-      Whitespace,
+      Whitespace(False),
       As,
-      Whitespace,
+      Whitespace(False),
       Identifier("day"),
-      Whitespace,
+      Whitespace(False),
     ]),
   )
 }
@@ -282,13 +347,13 @@ pub fn lex_definition_test() {
   |> should.equal(
     Ok([
       Identifier("yyyy"),
-      Whitespace,
+      Whitespace(False),
       Equals,
-      Whitespace,
+      Whitespace(False),
       CharacterClass("Digit"),
-      Whitespace,
+      Whitespace(False),
       Asterisk,
-      Whitespace,
+      Whitespace(False),
       Integer(4),
       Semicolon,
     ]),
@@ -300,9 +365,9 @@ pub fn lex_alternatives_test() {
   |> should.equal(
     Ok([
       SingleQuotedLiteral("a"),
-      Whitespace,
+      Whitespace(False),
       AlternativeOperator,
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("b"),
     ]),
   )
@@ -329,9 +394,9 @@ pub fn lex_annotation_test() {
     Ok([
       Bang,
       Identifier("case-insensitive"),
-      Whitespace,
+      Whitespace(False),
       Equals,
-      Whitespace,
+      Whitespace(False),
       TrueKeyword,
     ]),
   )
@@ -342,9 +407,9 @@ pub fn lex_excluding_expression_test() {
   |> should.equal(
     Ok([
       CharacterClass("Digit"),
-      Whitespace,
+      Whitespace(False),
       Excluding,
-      Whitespace,
+      Whitespace(False),
       SingleQuotedLiteral("8"),
       RangeOperator,
       SingleQuotedLiteral("9"),
@@ -386,9 +451,9 @@ pub fn lex_position_assertion_in_sequence_test() {
   |> should.equal(
     Ok([
       token.PositionAssertion("word-start"),
-      Whitespace,
+      Whitespace(False),
       CharacterClass("Alpha"),
-      Whitespace,
+      Whitespace(False),
       token.PositionAssertion("word-end"),
     ]),
   )

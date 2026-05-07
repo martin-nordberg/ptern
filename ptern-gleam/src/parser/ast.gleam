@@ -9,20 +9,39 @@ import gleam/option.{type Option}
 /// The top-level parsed document.
 pub type ParsedPtern {
   ParsedPtern(
+    /// A block of whole-line `#` comments at the very top of the source,
+    /// separated from the first annotation/definition/body by a blank line.
+    /// Empty list when no ptern-level comment is present.
+    ptern_comments: List(String),
     annotations: List(Annotation),
     definitions: List(Definition),
+    /// A block of whole-line `#` comments immediately above the body
+    /// expression (no blank line between them and the body).
+    body_comments: List(String),
     body: Expression,
   )
 }
 
 /// `!name = true` or `!name = false`.
 pub type Annotation {
-  Annotation(name: String, value: Bool)
+  Annotation(
+    /// Doc-comment lines immediately above this annotation (no blank line
+    /// between the last comment and the `!`).
+    comments: List(String),
+    name: String,
+    value: Bool,
+  )
 }
 
 /// `name = <expression> ;`
 pub type Definition {
-  Definition(name: String, body: Expression)
+  Definition(
+    /// Doc-comment lines immediately above this definition (no blank line
+    /// between the last comment and the name).
+    comments: List(String),
+    name: String,
+    body: Expression,
+  )
 }
 
 /// An expression is one or more sequences joined by `|`.
@@ -92,4 +111,10 @@ pub type ParseError {
   /// `expected` is a human-readable description; `got` is the token's string
   /// representation.
   UnexpectedToken(expected: String, got: String)
+  /// A comment block was not immediately followed by an annotation,
+  /// definition, or body expression (a blank line appeared between the
+  /// comment and the item it was meant to document).
+  OrphanedComment
+  /// One or more comment lines appear after the body expression.
+  TrailingComment
 }

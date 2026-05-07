@@ -90,10 +90,12 @@ pub type Token {
 
   /// One or more consecutive whitespace characters (spaces, tabs, newlines).
   /// A single `Whitespace` token is emitted for each unbroken run.
+  /// `has_blank_line` is `True` when the run contains at least one blank line
+  /// (a newline followed, possibly after spaces/tabs, by another newline).
   /// Whitespace between two sub-patterns acts as the sequence operator.
-  Whitespace
+  Whitespace(has_blank_line: Bool)
 
-  /// A single-line comment introduced by `#`, e.g. `# this is a comment`.
+  /// A whole-line comment introduced by `#` at the start of a line.
   /// `content` is the text after the `#` up to (but not including) the
   /// line terminator.
   Comment(content: String)
@@ -107,4 +109,8 @@ pub type LexError {
   /// A string literal was opened but never closed before end-of-input or a
   /// bare newline.
   UnterminatedString
+
+  /// A `#` was found after non-whitespace content on the same line.
+  /// Comments must occupy a whole line.
+  InlineComment
 }

@@ -1,5 +1,5 @@
 import gleam/option.{type Option, None, Some}
-import lexer/token.{type Token, Comment, Whitespace}
+import lexer/token.{type Token, Whitespace}
 
 /// A cursor over a flat list of tokens.
 ///
@@ -29,17 +29,17 @@ pub fn peek_raw(stream: Stream) -> Option(Token) {
   }
 }
 
-/// Return the next non-trivia token (skipping `Whitespace` and `Comment`)
-/// without advancing the stream.
+/// Return the next non-whitespace token (skipping `Whitespace` tokens of
+/// either kind) without advancing the stream.
+/// Comments are NOT skipped — they are structural nodes, not trivia.
 pub fn peek(stream: Stream) -> Option(Token) {
-  peek_after_trivia(stream.tokens)
+  peek_after_whitespace(stream.tokens)
 }
 
-fn peek_after_trivia(tokens: List(Token)) -> Option(Token) {
+fn peek_after_whitespace(tokens: List(Token)) -> Option(Token) {
   case tokens {
     [] -> None
-    [Whitespace, ..rest] -> peek_after_trivia(rest)
-    [Comment(_), ..rest] -> peek_after_trivia(rest)
+    [Whitespace(_), ..rest] -> peek_after_whitespace(rest)
     [tok, ..] -> Some(tok)
   }
 }
@@ -52,40 +52,52 @@ pub fn advance(stream: Stream) -> #(Option(Token), Stream) {
   }
 }
 
-/// Drop all leading `Whitespace` and `Comment` tokens.
-pub fn skip_trivia(stream: Stream) -> Stream {
+/// Drop all leading `Whitespace` tokens (both blank-line and non-blank).
+/// Comments are NOT dropped — use this inside constructs where no comment
+/// should appear.
+pub fn skip_whitespace(stream: Stream) -> Stream {
   case stream.tokens {
-    [Whitespace, ..rest] -> skip_trivia(Stream(rest))
-    [Comment(_), ..rest] -> skip_trivia(Stream(rest))
+    [Whitespace(_), ..rest] -> skip_whitespace(Stream(rest))
     _ -> stream
   }
 }
 
-/// Return `True` if the next raw token (before skipping trivia) is
+/// Drop a leading `Whitespace(False)` token if present.
+/// Stops at `Whitespace(True)` (blank-line whitespace).
+/// Used when collecting comment blocks: blank lines end a block.
+pub fn skip_non_blank_whitespace(stream: Stream) -> Stream {
+  case stream.tokens {
+    [Whitespace(False), ..rest] -> Stream(rest)
+    _ -> stream
+  }
+}
+
+/// Return `True` if the next raw token (before skipping whitespace) is
 /// `Whitespace`. Used by the sequence parser to detect the sequence operator.
 pub fn next_is_whitespace(stream: Stream) -> Bool {
   case stream.tokens {
-    [Whitespace, ..] -> True
+    [Whitespace(_), ..] -> True
     _ -> False
   }
 }
 
-/// Consume and return `True` if the next non-trivia token matches `expected`,
-/// advancing past it (and any leading trivia). Returns `False` without
-/// advancing if the token does not match or the stream is empty.
+/// Consume and return `True` if the next non-whitespace token matches
+/// `expected`, advancing past it (and any leading whitespace). Returns
+/// `False` without advancing if the token does not match or the stream is
+/// empty.
 pub fn eat(stream: Stream, expected: Token) -> #(Bool, Stream) {
-  let s = skip_trivia(stream)
+  let s = skip_whitespace(stream)
   case s.tokens {
     [tok, ..rest] if tok == expected -> #(True, Stream(rest))
     _ -> #(False, stream)
   }
 }
 
-/// Consume one raw `Whitespace` token if present. Does NOT skip comments or
-/// multiple whitespace tokens — only the immediate next token.
+/// Consume one raw `Whitespace` token if present. Does NOT skip multiple
+/// whitespace tokens — only the immediate next token.
 pub fn eat_whitespace(stream: Stream) -> Stream {
   case stream.tokens {
-    [Whitespace, ..rest] -> Stream(rest)
+    [Whitespace(_), ..rest] -> Stream(rest)
     _ -> stream
   }
 }
@@ -93,7 +105,7 @@ pub fn eat_whitespace(stream: Stream) -> Stream {
 /// Consume all leading whitespace tokens (a run).
 pub fn eat_all_whitespace(stream: Stream) -> Stream {
   case stream.tokens {
-    [Whitespace, ..rest] -> eat_all_whitespace(Stream(rest))
+    [Whitespace(_), ..rest] -> eat_all_whitespace(Stream(rest))
     _ -> stream
   }
 }
@@ -104,11 +116,7 @@ pub fn token_display(token: Token) -> String {
     token.SingleQuotedLiteral(c) -> "'" <> c <> "'"
     token.DoubleQuotedLiteral(c) -> "\"" <> c <> "\""
     token.CharacterClass(n) -> "%" <> n
-    token.Integer(n) -> {
-      // Convert int to string manually since we can't import gleam/int here
-      // (it's a small helper; the parser imports gleam/int itself).
-      int_to_string(n)
-    }
+    token.Integer(n) -> int_to_string(n)
     token.RangeOperator -> ".."
     token.Asterisk -> "*"
     token.AlternativeOperator -> "|"
@@ -125,15 +133,14 @@ pub fn token_display(token: Token) -> String {
     token.Fewest -> "fewest"
     token.PositionAssertion(name) -> "@" <> name
     token.Bang -> "!"
-
     token.QuestionMark -> "?"
     token.Identifier(n) -> n
-    token.Whitespace -> "<whitespace>"
+    token.Whitespace(_) -> "<whitespace>"
     token.Comment(_) -> "<comment>"
   }
 }
 
-/// Whether the stream has no more tokens (after skipping trivia).
+/// Whether the stream has no more tokens (after skipping whitespace).
 pub fn is_empty(stream: Stream) -> Bool {
   case peek(stream) {
     None -> True
@@ -146,8 +153,6 @@ pub fn is_empty(stream: Stream) -> Bool {
 // ---------------------------------------------------------------------------
 
 fn int_to_string(n: Int) -> String {
-  // Walk through the stdlib list of digit chars to build the decimal string.
-  // This avoids importing gleam/int in a helper module.
   case n < 0 {
     True -> "-" <> non_negative_to_string(0 - n)
     False -> non_negative_to_string(n)
@@ -172,4 +177,3 @@ fn non_negative_to_string(n: Int) -> String {
     False -> non_negative_to_string(n / 10) <> digit
   }
 }
-

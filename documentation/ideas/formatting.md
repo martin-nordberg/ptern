@@ -1,13 +1,13 @@
 # Ptern Source Formatting Specification
 
-**Version:** 0.1 (Draft)  
-**Date:** 2026-05-06
+**Version:** 0.2 (Draft)  
+**Date:** 2026-05-07
 
 ---
 
 ## 1. Introduction
 
-This document specifies the `format` operation, which accepts a Ptern source string and returns a canonically formatted version of that source. The formatted output is syntactically and semantically equivalent to the input: it produces the same compiled pattern and captures the same language. Comments are not preserved.
+This document specifies the `format` operation, which accepts a Ptern source string and returns a canonically formatted version of that source. The formatted output is syntactically and semantically equivalent to the input: it produces the same compiled pattern and captures the same language. Doc comments are preserved.
 
 The formatter operates on the parse tree produced by the Ptern lexer and parser. It does not require a semantically valid ptern; semantic errors (undefined references, circular definitions, etc.) do not prevent formatting. Only lex and parse errors cause `format` to fail.
 
@@ -45,7 +45,7 @@ pub fn format(source: String, options: FormatOptions) -> Result(String, FormatEr
 | Option | Type | Default | Constraint | Description |
 |--------|------|---------|------------|-------------|
 | `line_width` | `Int` | `80` | `>= 40` | Target maximum column width. Lines may exceed this width when no valid break point exists within the limit. |
-| `compact` | `Bool` | `False` | — | When `True`, omit optional whitespace around operators and suppress blank separator lines between sections. |
+| `compact` | `Bool` | `False` | — | When `True`, omit optional whitespace around operators and suppress blank separator lines between sections and between commented items within a block. |
 | `aligned` | `Bool` | `True` | — | When `True`, vertically align `=` signs within the annotation block and within the definition block independently. `compact` does not override this option. |
 | `reordered` | `Bool` | `False` | — | When `True`, sort definitions into topological layers (dependencies before dependents) and then alphabetically within each layer. See §5.1. |
 
@@ -59,9 +59,21 @@ If `line_width < 40`, `format` returns `Error(InvalidLineWidth)` without further
 
 ---
 
-## 4. Comments
+## 4. Doc Comments
 
-Comments (from `#` to end of line) are not present in the parse tree and are therefore not present in the formatted output. This is an intentional consequence of formatting: the canonical form of a ptern contains no comments.
+Doc comments are stored in the parse tree (`ptern_comments`, `body_comments`, `Annotation.comments`, `Definition.comments`) and are reproduced in the formatted output. Comment content is preserved verbatim — no normalization, trimming, or line-wrapping is applied to the text following `#`.
+
+Each comment line is emitted as `#` followed by the stored content string. No trailing whitespace is emitted on comment lines.
+
+### 4.1 Ptern-Level Comment Block
+
+If `ptern_comments` is non-empty, the ptern-level comment block is emitted first, before all other output. Each string in the list occupies one line (`#` + content). The block is followed by exactly one blank line regardless of the `compact` setting — this blank line is syntactically required to preserve the ptern-level vs. item-level distinction on re-parse.
+
+### 4.2 Item-Level Comments
+
+Each `Annotation`, `Definition`, and the body expression may carry a comment block. When present, item-level comments are emitted immediately above the item they document, with no blank line between the last comment line and the item.
+
+Within the annotation block and within the definition block, a blank line is inserted before an item's comment block whenever a prior item has already been emitted in that same block and `compact = False`. This blank line visually attaches the comment to its item and separates it from the item above. When `compact = True`, no blank lines are inserted within annotation or definition blocks.
 
 ---
 
@@ -69,11 +81,13 @@ Comments (from `#` to end of line) are not present in the parse tree and are the
 
 The formatted output consists of the following sections in order, with no leading or trailing blank lines in the output as a whole:
 
-1. **Annotation block** — zero or more annotation lines, sorted lexicographically by annotation name.
-2. **Blank separator** — exactly one blank line, present if and only if both the annotation block and at least one subsequent section are non-empty, and `compact = False`.
-3. **Definition block** — zero or more definition lines, ordered as specified in §5.1.
-4. **Blank separator** — exactly one blank line, present if and only if both the definition block and the body expression section are non-empty, and `compact = False`.
-5. **Body expression** — the body expression, which occupies one or more lines.
+1. **Ptern-level comment block** — if `ptern_comments` is non-empty, as described in §4.1, including its mandatory trailing blank line.
+2. **Annotation block** — zero or more annotations, each optionally preceded by item-level comments (§4.2), sorted lexicographically by annotation name.
+3. **Blank separator** — exactly one blank line, present if and only if the annotation block is non-empty, at least one subsequent section is non-empty, and `compact = False`.
+4. **Definition block** — zero or more definitions, each optionally preceded by item-level comments (§4.2), ordered as specified in §5.1.
+5. **Blank separator** — exactly one blank line, present if and only if the definition block is non-empty, the body expression section is non-empty, and `compact = False`.
+6. **Body comment block** — if `body_comments` is non-empty, the comment lines emitted directly above the body expression with no blank line between the last comment and the body.
+7. **Body expression** — the body expression, which occupies one or more lines.
 
 ### 5.1 Definition Ordering
 
@@ -192,10 +206,14 @@ Rule B1 may be applied repeatedly to continuation lines under the same condition
 
 Annotations are never broken across lines. An annotation that exceeds `line_width` is emitted on a single line. Because the minimum valid `line_width` is 40 (§2.2) and annotation lines cannot exceed the length of a valid annotation token, this condition is not expected to arise in practice.
 
+### 8.5 Comment Lines
+
+Comment lines are never broken across lines. The text following `#` is emitted verbatim on a single line regardless of `line_width`.
+
 ---
 
 ## 9. Open Questions
 
 The following questions are not resolved by this version of the specification and must be addressed before implementation:
 
-1. **Comment preservation** — should an option be provided to round-trip comments, associating each comment with the nearest following syntactic element so it can be re-emitted in the formatted output?
+1. **Annotation reordering and comment attachment** — annotations are sorted lexicographically by name (§5). When annotations are reordered, their attached item-level comments move with them. This is the expected behaviour, but it means the output comment order may differ from the source comment order. No action is required — this is stated here for clarity.

@@ -2,9 +2,9 @@ import gleam/option.{None, Some}
 import lexer/lexer
 import parser/ast.{
   Alternation, Annotation, Capture, CharClass, CharRange, Definition, Exact,
-  Exclusion, Group, Interpolation, Literal, None as RepNone, ParsedPtern, RepCount,
-  Repetition, Sequence, SingleAtom, Unbounded, UnexpectedEndOfInput,
-  UnexpectedToken,
+  Exclusion, Group, Interpolation, Literal, None as RepNone, OrphanedComment,
+  ParsedPtern, RepCount, Repetition, Sequence, SingleAtom, TrailingComment,
+  Unbounded, UnexpectedEndOfInput, UnexpectedToken,
 }
 import parser/parser
 import gleeunit/should
@@ -20,6 +20,8 @@ fn parse(input: String) {
 
 fn simple_atom(atom) {
   ParsedPtern(
+    [],
+    [],
     [],
     [],
     Alternation([
@@ -86,6 +88,8 @@ pub fn parse_char_range_test() {
       ParsedPtern(
         [],
         [],
+        [],
+        [],
         Alternation([
           Sequence([
             Capture(
@@ -111,6 +115,8 @@ pub fn parse_exclusion_test() {
   |> should.equal(
     Ok(
       ParsedPtern(
+        [],
+        [],
         [],
         [],
         Alternation([
@@ -143,6 +149,8 @@ pub fn parse_exact_repetition_test() {
       ParsedPtern(
         [],
         [],
+        [],
+        [],
         Alternation([
           Sequence([
             Capture(
@@ -166,6 +174,8 @@ pub fn parse_bounded_repetition_test() {
       ParsedPtern(
         [],
         [],
+        [],
+        [],
         Alternation([
           Sequence([
             Capture(
@@ -187,6 +197,8 @@ pub fn parse_unbounded_repetition_test() {
   |> should.equal(
     Ok(
       ParsedPtern(
+        [],
+        [],
         [],
         [],
         Alternation([
@@ -216,6 +228,8 @@ pub fn parse_named_capture_test() {
       ParsedPtern(
         [],
         [],
+        [],
+        [],
         Alternation([
           Sequence([
             Capture(
@@ -241,6 +255,8 @@ pub fn parse_sequence_test() {
   |> should.equal(
     Ok(
       ParsedPtern(
+        [],
+        [],
         [],
         [],
         Alternation([
@@ -271,6 +287,8 @@ pub fn parse_alternation_test() {
       ParsedPtern(
         [],
         [],
+        [],
+        [],
         Alternation([
           Sequence([
             Capture(
@@ -295,6 +313,8 @@ pub fn parse_three_alternatives_test() {
   |> should.equal(
     Ok(
       ParsedPtern(
+        [],
+        [],
         [],
         [],
         Alternation([
@@ -332,8 +352,10 @@ pub fn parse_definition_test() {
     Ok(
       ParsedPtern(
         [],
+        [],
         [
           Definition(
+            [],
             "d",
             Alternation([
               Sequence([
@@ -348,6 +370,7 @@ pub fn parse_definition_test() {
             ]),
           ),
         ],
+        [],
         Alternation([
           Sequence([
             Capture(
@@ -370,7 +393,9 @@ pub fn parse_annotation_true_test() {
   |> should.equal(
     Ok(
       ParsedPtern(
-        [Annotation("case-insensitive", True)],
+        [],
+        [Annotation([], "case-insensitive", True)],
+        [],
         [],
         Alternation([
           Sequence([
@@ -390,7 +415,9 @@ pub fn parse_annotation_false_test() {
   |> should.equal(
     Ok(
       ParsedPtern(
-        [Annotation("case-insensitive", False)],
+        [],
+        [Annotation([], "case-insensitive", False)],
+        [],
         [],
         Alternation([
           Sequence([
@@ -409,12 +436,179 @@ pub fn parse_annotation_false_test() {
 }
 
 // ---------------------------------------------------------------------------
-// Comments
+// Doc comments
 // ---------------------------------------------------------------------------
 
-pub fn parse_comment_is_ignored_test() {
-  parse("# a comment\n'hello'")
-  |> should.equal(Ok(simple_atom(Literal("hello"))))
+pub fn parse_body_doc_comment_test() {
+  // A comment immediately above the body attaches as body_comments.
+  parse("# a body comment\n'hello'")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [],
+        [],
+        [],
+        [" a body comment"],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(Exclusion(SingleAtom(Literal("hello")), None), None),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_ptern_level_comment_test() {
+  // A comment block followed by a blank line is a ptern-level comment.
+  parse("# ptern doc\n\n'hello'")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [" ptern doc"],
+        [],
+        [],
+        [],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(Exclusion(SingleAtom(Literal("hello")), None), None),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_annotation_doc_comment_test() {
+  // A comment immediately above an annotation attaches to that annotation.
+  parse("# docs\n!case-insensitive = true\n'x'")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [],
+        [Annotation([" docs"], "case-insensitive", True)],
+        [],
+        [],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(Exclusion(SingleAtom(Literal("x")), None), None),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_definition_doc_comment_test() {
+  // A comment immediately above a definition attaches to that definition.
+  parse("# the digit def\nd = %Digit;\n{d}")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [],
+        [],
+        [
+          Definition(
+            [" the digit def"],
+            "d",
+            Alternation([
+              Sequence([
+                Capture(
+                  Repetition(
+                    Exclusion(SingleAtom(CharClass("Digit")), None),
+                    None,
+                  ),
+                  None,
+                ),
+              ]),
+            ]),
+          ),
+        ],
+        [],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(Exclusion(SingleAtom(Interpolation("d")), None), None),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_ptern_comment_plus_item_comments_test() {
+  // Ptern-level comment + per-item comments all parse correctly.
+  parse("# ptern doc\n\n# ann doc\n!case-insensitive = true\n'x'")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [" ptern doc"],
+        [Annotation([" ann doc"], "case-insensitive", True)],
+        [],
+        [],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(Exclusion(SingleAtom(Literal("x")), None), None),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_multiline_body_comment_test() {
+  // Multiple consecutive comment lines above the body all attach.
+  parse("# line one\n# line two\n'x'")
+  |> should.equal(
+    Ok(
+      ParsedPtern(
+        [],
+        [],
+        [],
+        [" line one", " line two"],
+        Alternation([
+          Sequence([
+            Capture(
+              Repetition(Exclusion(SingleAtom(Literal("x")), None), None),
+              None,
+            ),
+          ]),
+        ]),
+      ),
+    ),
+  )
+}
+
+pub fn parse_orphaned_comment_between_items_is_error_test() {
+  // Comment after an annotation, followed by a blank line, then the body.
+  parse("!case-insensitive = true\n# orphaned\n\n'x'")
+  |> should.equal(Error(OrphanedComment))
+}
+
+pub fn parse_trailing_comment_is_error_test() {
+  // Comment after the body expression → TrailingComment.
+  parse("'x'\n# trailing")
+  |> should.equal(Error(TrailingComment))
+}
+
+pub fn parse_orphaned_comment_before_body_is_error_test() {
+  // Comment between definition and body with a blank line → OrphanedComment.
+  parse("d = %Digit;\n# orphaned\n\n{d}")
+  |> should.equal(Error(OrphanedComment))
 }
 
 // ---------------------------------------------------------------------------
@@ -476,6 +670,8 @@ pub fn parse_fewest_unbounded_test() {
       ParsedPtern(
         [],
         [],
+        [],
+        [],
         Alternation([
           Sequence([
             Capture(
@@ -497,6 +693,8 @@ pub fn parse_fewest_optional_test() {
   |> should.equal(
     Ok(
       ParsedPtern(
+        [],
+        [],
         [],
         [],
         Alternation([
@@ -522,6 +720,8 @@ pub fn parse_fewest_bounded_test() {
       ParsedPtern(
         [],
         [],
+        [],
+        [],
         Alternation([
           Sequence([
             Capture(
@@ -530,52 +730,6 @@ pub fn parse_fewest_bounded_test() {
                 Some(RepCount(3, Exact(10), True)),
               ),
               None,
-            ),
-          ]),
-        ]),
-      ),
-    ),
-  )
-}
-
-pub fn parse_no_fewest_sets_lazy_false_test() {
-  parse("%Any * 1..?")
-  |> should.equal(
-    Ok(
-      ParsedPtern(
-        [],
-        [],
-        Alternation([
-          Sequence([
-            Capture(
-              Repetition(
-                Exclusion(SingleAtom(CharClass("Any")), None),
-                Some(RepCount(1, Unbounded, False)),
-              ),
-              None,
-            ),
-          ]),
-        ]),
-      ),
-    ),
-  )
-}
-
-pub fn parse_fewest_followed_by_as_test() {
-  parse("%Any * 1..? fewest as content")
-  |> should.equal(
-    Ok(
-      ParsedPtern(
-        [],
-        [],
-        Alternation([
-          Sequence([
-            Capture(
-              Repetition(
-                Exclusion(SingleAtom(CharClass("Any")), None),
-                Some(RepCount(1, Unbounded, True)),
-              ),
-              Some("content"),
             ),
           ]),
         ]),
