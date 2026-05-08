@@ -1,5 +1,6 @@
 import semantic/bounds
 import codegen/codegen
+import formatter/formatter
 import codegen/substitution.{
   type SubstitutionPlan,
   PlanAlternation,
@@ -28,6 +29,27 @@ import semantic/validator
 
 // ---------------------------------------------------------------------------
 // Public types
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Format types (re-exported from formatter module)
+// ---------------------------------------------------------------------------
+
+pub type FormatOptions = formatter.FormatOptions
+
+pub type FormatError = formatter.FormatError
+
+pub const default_format_options = formatter.default_format_options
+
+pub fn format(
+  source: String,
+  options: formatter.FormatOptions,
+) -> Result(String, formatter.FormatError) {
+  formatter.format(source, options)
+}
+
+// ---------------------------------------------------------------------------
+// Compile types
 // ---------------------------------------------------------------------------
 
 pub type CompileError {

@@ -1017,6 +1017,138 @@ Simultaneous lookahead requirements are not expressible as a single ptern. Use m
 
 ---
 
+## Formatting
+
+The `ptern.format` function takes a ptern source string and returns a canonically formatted version. It is useful for normalising hand-written pterns, building editor integrations, and generating readable output from code that produces ptern strings programmatically.
+
+```gleam
+let source = "!case-insensitive=true\nword=%Alpha*1..?;\n{word}"
+
+case ptern.format(source, ptern.default_format_options()) {
+  Ok(formatted) -> formatted
+  Error(ptern.InvalidLineWidth) -> panic as "line_width must be >= 40"
+  Error(ptern.FormatLexError(_)) -> panic as "source has lex errors"
+  Error(ptern.FormatParseError(_)) -> panic as "source has parse errors"
+}
+// "!case-insensitive = true\n\nword = %Alpha * 1..? ;\n\n{word}"
+```
+
+Formatting succeeds as long as the source lexes and parses — semantic errors (undefined references, circular definitions, etc.) do not prevent it.
+
+### FormatOptions
+
+```gleam
+pub type FormatOptions {
+  FormatOptions(
+    line_width: Int,
+    compact: Bool,
+    aligned: Bool,
+    reordered: Bool,
+  )
+}
+
+pub fn default_format_options() -> FormatOptions {
+  FormatOptions(line_width: 80, compact: False, aligned: True, reordered: False)
+}
+```
+
+`ptern.default_format_options()` is the starting point; override individual fields using Gleam's record-update syntax:
+
+```gleam
+let opts = ptern.FormatOptions(..ptern.default_format_options(), compact: True)
+```
+
+### What the formatter does
+
+**Output structure.** The formatter emits sections in this order:
+
+1. Ptern-level doc comment block (followed by a mandatory blank line)
+2. Annotation block (annotations sorted lexicographically by name)
+3. Blank separator (when annotations and a subsequent section are both present, and `compact = false`)
+4. Definition block (in source order, or topological order when `reordered = true`)
+5. Blank separator (when definitions and the body are both present, and `compact = false`)
+6. Body doc comment block
+7. Body expression
+
+**Token normalisation.** String literals are normalised to single-quote delimiters. Double quotes are used only when the literal content contains a single-quote character. Character class names are normalised to title case (`%Alpha`, `%Digit`, etc.).
+
+**Alignment.** When `aligned = true` (the default), the `=` signs within the annotation block are aligned to a common column, and the `=` signs within the definition block are aligned to a separate common column. The column is `(length of longest name in the block) + 2`.
+
+```gleam
+// Input (misaligned):
+// !case-insensitive = true
+// !multiline = true
+// !substitutable = true
+//
+// Formatted (aligned = true):
+// !case-insensitive = true
+// !multiline        = true
+// !substitutable    = true
+```
+
+**Line breaking.** Long definition lines are broken using a cascade of rules: first after `=` if the body fits in `line_width - 4` characters, then at the rightmost sequence space, then before the rightmost outer `|`. Long body expression lines are broken at the rightmost sequence space, then before the rightmost outer `|`. Lines that cannot be broken within `line_width` are emitted at their natural length.
+
+### Compact mode
+
+Setting `compact: True` removes optional whitespace around `*`, `|`, `(`, and `)` operators, and suppresses blank separator lines between blocks and between commented items within a block.
+
+```gleam
+let compact = ptern.FormatOptions(..ptern.default_format_options(), compact: True)
+
+ptern.format("( 'a' | 'b' ) * 3", compact)
+// Ok("('a'|'b')*3")
+```
+
+Keyword spacing (`as`, `excluding`) is always one space on each side regardless of `compact`.
+
+### Alignment disabled
+
+```gleam
+let unaligned = ptern.FormatOptions(..ptern.default_format_options(), aligned: False)
+
+let source = "year = %Digit * 4 ;\nmonth = %Digit * 2 ;"
+ptern.format(source, unaligned)
+// Ok("month = %Digit * 2 ;\nyear = %Digit * 4 ;")
+```
+
+(Definitions are still in source order; `unaligned` only changes whether `=` signs are padded.)
+
+### Reordering definitions
+
+When `reordered: True`, definitions are sorted into topological layers — dependencies come before the definitions that reference them — and alphabetically within each layer.
+
+```gleam
+let reorder = ptern.FormatOptions(..ptern.default_format_options(), reordered: True)
+
+let source = "full = {first} ' ' {last} ;\nfirst = %Alpha * 1..? ;\nlast = %Alpha * 1..? ;"
+ptern.format(source, reorder)
+// Ok("first = %Alpha * 1..? ;\nlast  = %Alpha * 1..? ;\n\nfull  = {first} ' ' {last} ;")
+```
+
+Definitions involved in dependency cycles are placed after all successfully sorted definitions, in their original source order.
+
+### Doc comment preservation
+
+Doc comments are preserved verbatim. Item-level comments stay attached to the item they document and move with it when sorting.
+
+```gleam
+let source = "# Match any alphabetic word\n\n# Definition of word\nword = %Alpha * 1..? ;\n{word}"
+ptern.format(source, ptern.default_format_options())
+// Ok("# Match any alphabetic word\n\n# Definition of word\nword = %Alpha * 1..? ;\n\n{word}")
+```
+
+### Idempotency
+
+Formatting is idempotent: applying `format` to already-formatted output returns the same string.
+
+```gleam
+let assert Ok(once) = ptern.format(source, opts)
+let assert Ok(twice) = ptern.format(once, opts)
+assert once == twice  // always true
+```
+
+---
+
 ## Appendix A: Character Class Reference
 
 ### Special
