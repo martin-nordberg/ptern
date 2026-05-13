@@ -9,6 +9,8 @@
 
 The Ptern Playground is a browser-based interactive environment for writing, formatting, and testing Ptern patterns without writing host-language code. It depends only on the transpiled JavaScript output of the Gleam implementation and runs entirely client-side.
 
+The playground is a self-contained project located in the `ptern-playground/` subdirectory of the repository, alongside `ptern-gleam/`. It consumes the compiled output of `ptern-gleam/` as a local dependency.
+
 ---
 
 ## 2. Technology Stack
@@ -21,7 +23,21 @@ The Ptern Playground is a browser-based interactive environment for writing, for
 | Dev runtime | Bun |
 | Ptern engine | Transpiled Gleam output (ES module) |
 
-The playground imports the compiled Gleam output as a plain ES module and calls the public Ptern API directly in the browser. No server or build step is required at runtime.
+The playground imports the compiled Gleam output as a plain ES module and calls the public Ptern API directly in the browser. No server is required at runtime.
+
+### 2.1 Gleam Output Integration
+
+The compiled Gleam JavaScript is not imported directly from `ptern-gleam/build/`; instead it is copied into `ptern-playground/src/ptern/` as part of the dev/build script. This keeps the playground project self-contained within Vite's project root. The copy includes the `ptern` package output and all transitive Gleam stdlib dependencies.
+
+### 2.2 Dev and Build Script
+
+A single combined script (e.g. `bun run dev`) performs the following steps in order:
+
+1. Run `gleam build` in `ptern-gleam/` to produce the compiled JavaScript output.
+2. Copy the relevant output files into `ptern-playground/src/ptern/`.
+3. Start the Vite dev server.
+
+The production build script follows the same steps 1–2, then runs `vite build` in place of step 3.
 
 ---
 
@@ -217,7 +233,34 @@ Format options (§5.5) are saved to local storage under a versioned key (e.g. `p
 
 ### 8.2 Ptern Source and Test Tabs
 
-Ptern source and all tab data are saved to local storage on every change and restored on load. The key is versioned (e.g. `ptern-playground-v1-state`) to allow schema changes without reading stale data.
+Ptern source and all tab data are saved to local storage on every change and restored on load. The storage key is `ptern-playground-state`. A `version` field inside the payload allows the app to detect and discard stale data when the schema changes, without needing to version the key itself.
+
+The schema is:
+
+```json
+{
+  "version": 1,
+  "source": "!case-insensitive = true\n\n%Alpha * 1..? as word",
+  "formatOptions": {
+    "aligned": true,
+    "compact": false,
+    "lineWidth": 80,
+    "reordered": false
+  },
+  "tabs": [
+    {
+      "input": "Hello World",
+      "replacements": "{ \"word\": \"there\" }"
+    }
+  ],
+  "activeTab": 0
+}
+```
+
+Notes:
+- `replacements` is stored as a raw string so an in-progress or invalid JSON value is preserved across reloads.
+- Test results are not persisted; they are always re-run after load to avoid displaying stale output.
+- Field names use camelCase to match JavaScript/JSON convention.
 
 URL-based state encoding is not used: a pattern with several definitions and multiple test cases can easily exceed practical URL length limits, making it an unreliable sharing mechanism.
 
@@ -238,3 +281,6 @@ URL-based state encoding is not used: a pattern with several definitions and mul
 | ~~9.9~~ | ~~Single-line or multi-line input?~~ Resolved: multi-line text area. |
 | ~~9.10~~ | ~~How to expose `match_next_in`'s `start_index` in the UI?~~ Resolved: omitted from the playground. |
 | ~~9.11~~ | ~~How to expose `replace_next_in`'s `start_index` in the UI?~~ Resolved: omitted from the playground. |
+| ~~9.12~~ | ~~What is the local storage JSON schema?~~ Resolved: see §8.1–8.2. |
+| ~~9.13~~ | ~~What is the deployment target?~~ Resolved: manual static hosting for now; GitHub Pages is a future option if the library warrants a public presence. |
+| ~~9.14~~ | ~~What is the top-level directory structure of `ptern-playground/`?~~ Resolved: standard SolidJS (Vite) template structure; Gleam output copied into `src/ptern/` including stdlib dependencies. |
