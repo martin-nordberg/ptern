@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-mono: 'Lucida Console', Monaco, 'Courier New', monospace;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+}
