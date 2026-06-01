@@ -1,5 +1,7 @@
 # Ptern User Guide — Gleam API
 
+> **See also:** [TypeScript User Guide](../../documentation/typescript-user-guide.md) for the `@ptern/tern` TypeScript edition.
+
 Ptern is a pattern language that compiles to regular expressions. It is designed to be readable first — every construct is either a plain keyword or punctuation that carries an obvious meaning. You should be able to read a ptern aloud and have it make sense.
 
 This guide builds up the language from scratch, introducing each concept with working examples. The formal specification (`ptern-specification.md`) is the complete reference; this guide is the on-ramp.

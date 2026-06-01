@@ -1,8 +1,37 @@
 # Ptern Multi-Language Strategy — Ideas and Trade-offs
 
 This document captures a trail of thinking about extending Ptern beyond its current
-JavaScript/TypeScript target. Nothing here is a decision; it is a reference for future
-planning.
+JavaScript/TypeScript target.
+
+---
+
+## Decision record: TypeScript edition (2026)
+
+**Architecture chosen: Option A — full rewrite per language.**
+
+The TypeScript edition (`ptern-typescript/`) is a complete, standalone reimplementation of
+the full compiler pipeline (lexer → parser → semantic passes → codegen → runtime →
+formatter). It shares no generated code with the Gleam edition.
+
+**Rationale:**
+
+- The Gleam-to-JavaScript compilation output embeds Gleam's runtime scaffolding, which
+  increases package size and makes the public API dependent on Gleam's calling conventions.
+- A native TypeScript implementation ships as standard ESM with no runtime dependencies.
+- Full parity of the formatter requires a TypeScript port regardless; once the compiler is
+  ported, the remainder is incremental.
+- AI-assisted porting substantially reduces the labour cost that historically made Option A
+  unattractive. See §3 below.
+
+**Consistency mechanism: shared JSON fixture corpus.**
+
+The `test-fixtures/` directory at the repo root contains JSON fixture files that are loaded
+and executed by both the Gleam test suite and the TypeScript test driver
+(`ptern-typescript/test/driver.test.ts`). The Gleam edition is the authoritative source for
+fixture content; the TypeScript driver must match it exactly. This provides structural
+correctness guarantees without requiring a shared runtime.
+
+---
 
 ---
 

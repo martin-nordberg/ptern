@@ -42,6 +42,11 @@ Ptern compiles to a JavaScript ECMAScript `v`-mode regular expression (Unicode s
 
 This document specifies the Ptern source language: its lexical structure, grammar, compile-time constraints, and operational semantics for matching, replacement, and substitution. It does not specify the runtime environment, memory model, or language-specific binding APIs beyond the abstract operation signatures in §9–§11.
 
+Language-specific APIs are documented separately per edition:
+
+- **Gleam:** `ptern-gleam/doc/user-guide.md`
+- **TypeScript:** `documentation/typescript-user-guide.md`
+
 ---
 
 ## 2. Source Text
