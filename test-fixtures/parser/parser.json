@@ -1,0 +1,8 @@
+[
+  { "id": "empty_input",        "input": "",                                              "expect": {"error":"unexpectedEndOfInput"} },
+  { "id": "unclosed_group",     "input": "('a'",                                          "expect": {"error":"unexpectedToken"} },
+  { "id": "missing_semicolon",  "input": "d = %Digit {d}",                               "expect": {"error":"unexpectedToken"} },
+  { "id": "orphaned_comment",   "input": "!case-insensitive = true\n# orphaned\n\n'x'",  "expect": {"error":"orphanedComment"} },
+  { "id": "trailing_comment",   "input": "'x'\n# trailing",                              "expect": {"error":"trailingComment"} },
+  { "id": "orphaned_before_body","input": "d = %Digit;\n# orphaned\n\n{d}",              "expect": {"error":"orphanedComment"} }
+]

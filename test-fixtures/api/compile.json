@@ -1,0 +1,6 @@
+[
+  { "id": "lex_error_bare_at",          "pattern": "@",                        "expect": {"error":"lexError"} },
+  { "id": "parse_error_empty",          "pattern": "",                         "expect": {"error":"parseError"} },
+  { "id": "semantic_error_empty_string","pattern": "''",                       "expect": {"error":"semanticErrors"} },
+  { "id": "semantic_unknown_annotation","pattern": "!unknown = true\n'x'",     "expect": {"error":"semanticErrors"} }
+]

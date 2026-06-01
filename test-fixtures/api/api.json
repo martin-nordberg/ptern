@@ -1,0 +1,121 @@
+[
+  {
+    "id": "hello_literal",
+    "pattern": "'hello'",
+    "cases": [
+      { "op": "matchesAllOf",  "input": "hello",           "expect": true },
+      { "op": "matchesAllOf",  "input": "hello world",     "expect": false },
+      { "op": "matchesAllOf",  "input": "",                "expect": false },
+      { "op": "matchesStartOf","input": "helloworld",      "expect": true },
+      { "op": "matchesStartOf","input": "worldhello",      "expect": false },
+      { "op": "matchesEndOf",  "input": "sayhello",        "expect": true },
+      { "op": "matchesEndOf",  "input": "hellosay",        "expect": false },
+      { "op": "matchesIn",     "input": "say hello world", "expect": true },
+      { "op": "matchesIn",     "input": "world",           "expect": false },
+      { "op": "matchAllOf",    "input": "hello",           "expect": {"index":0,"length":5,"captures":{}} },
+      { "op": "matchAllOf",    "input": "hello world",     "expect": null },
+      { "op": "matchFirstIn",  "input": "say hello!",      "expect": {"index":4,"length":5,"captures":{}} },
+      { "op": "matchFirstIn",  "input": "world",           "expect": null }
+    ]
+  },
+
+  {
+    "id": "digit4_year",
+    "pattern": "%Digit * 4 as year",
+    "cases": [
+      { "op": "matchesAllOf",  "input": "2024",         "expect": true },
+      { "op": "matchesAllOf",  "input": "20240",        "expect": false },
+      { "op": "matchesAllOf",  "input": "abc",          "expect": false },
+      { "op": "matchAllOf",    "input": "2024",         "expect": {"index":0,"length":4,"captures":{"year":"2024"}} },
+      { "op": "matchAllOf",    "input": "abc",          "expect": null },
+      { "op": "matchStartOf",  "input": "2024rest",     "expect": {"index":0,"length":4,"captures":{"year":"2024"}} },
+      { "op": "matchFirstIn",  "input": "year 2024 end","expect": {"index":5,"length":4,"captures":{"year":"2024"}} },
+      { "op": "replaceAllOf",  "input": "2024",         "replacements": {"year":"2099"}, "expect": "2099" },
+      { "op": "replaceAllOf",  "input": "abc",          "replacements": {"year":"2099"}, "expect": "abc" },
+      { "op": "replaceStartOf","input": "2024abc",      "replacements": {"year":"2099"}, "expect": "2099abc" },
+      { "op": "replaceEndOf",  "input": "abc2024",      "replacements": {"year":"2099"}, "expect": "abc2099" }
+    ]
+  },
+
+  {
+    "id": "case_insensitive",
+    "pattern": "!case-insensitive = true\n'hello'",
+    "cases": [
+      { "op": "matchesAllOf", "input": "HELLO", "expect": true },
+      { "op": "matchesAllOf", "input": "Hello", "expect": true },
+      { "op": "matchesAllOf", "input": "hello", "expect": true },
+      { "op": "matchesAllOf", "input": "world", "expect": false }
+    ]
+  },
+
+  {
+    "id": "digits_all_in",
+    "pattern": "%Digit * 1..? as n",
+    "cases": [
+      { "op": "matchAllIn", "input": "a1 b22 c333", "expect": [
+        { "index": 1, "length": 1, "captures": { "n": "1" } },
+        { "index": 4, "length": 2, "captures": { "n": "22" } },
+        { "index": 8, "length": 3, "captures": { "n": "333" } }
+      ]},
+      { "op": "matchAllIn",  "input": "abcdef",        "expect": [] },
+      { "op": "matchFirstIn","input": "abc 42 def 99", "expect": {"index":4,"length":2,"captures":{"n":"42"}} },
+      { "op": "matchNextIn", "input": "abc 42 def 99", "startIndex": 7, "expect": {"index":11,"length":2,"captures":{"n":"99"}} }
+    ]
+  },
+
+  {
+    "id": "digits_replace_in",
+    "pattern": "!replacements-ignore-matching = true\n%Digit * 1..? as n",
+    "cases": [
+      { "op": "replaceAllIn",  "input": "a1 b22 c333",    "replacements": {"n":"X"}, "expect": "aX bX cX" },
+      { "op": "replaceAllIn",  "input": "abcdef",          "replacements": {"n":"X"}, "expect": "abcdef" },
+      { "op": "replaceFirstIn","input": "abc 42 def 99",   "replacements": {"n":"0"}, "expect": "abc 0 def 99" },
+      { "op": "replaceNextIn", "input": "abc 42 def 99",   "startIndex": 7, "replacements": {"n":"0"}, "expect": "abc 42 def 0" }
+    ]
+  },
+
+  {
+    "id": "substitute_year",
+    "pattern": "!substitutable = true\n%Digit * 4 as year",
+    "cases": [
+      { "op": "substitute", "captures": {"year":"2024"}, "expect": "2024" }
+    ]
+  },
+
+  {
+    "id": "substitute_date",
+    "pattern": "!substitutable = true\n%Digit * 4 as year '-' %Digit * 2 as month '-' %Digit * 2 as day",
+    "cases": [
+      { "op": "substitute", "captures": {"year":"2024","month":"03","day":"15"}, "expect": "2024-03-15" }
+    ]
+  },
+
+  {
+    "id": "substitute_ignore_matching",
+    "pattern": "!substitutable = true\n!substitutions-ignore-matching = true\n%Digit * 4 as year",
+    "cases": [
+      { "op": "substitute", "captures": {"year":"abcd"}, "expect": "abcd" }
+    ]
+  },
+
+  {
+    "id": "iso_date",
+    "pattern": "yyyy = %Digit * 4;\nmm = ('0' '1'..'9') | ('1' '0'..'2');\ndd = ('0' '1'..'9') | ('1'..'2' %Digit) | ('3' '0'..'1');\n{yyyy} as year '-' {mm} as month '-' {dd} as day",
+    "cases": [
+      { "op": "matchesAllOf", "input": "2024-03-15", "expect": true },
+      { "op": "matchesAllOf", "input": "2024-3-15",  "expect": false },
+      { "op": "matchAllOf",   "input": "2024-03-15", "expect": {"index":0,"length":10,"captures":{"year":"2024","month":"03","day":"15"}} }
+    ]
+  },
+
+  {
+    "id": "semver",
+    "pattern": "num = %Digit * 1..10; {num} as major '.' {num} as minor '.' {num} as patch",
+    "cases": [
+      { "op": "matchesAllOf", "input": "1.2.3",    "expect": true },
+      { "op": "matchesAllOf", "input": "10.20.300","expect": true },
+      { "op": "matchesAllOf", "input": "1.2",      "expect": false },
+      { "op": "matchAllOf",   "input": "1.2.3",    "expect": {"index":0,"length":5,"captures":{"major":"1","minor":"2","patch":"3"}} }
+    ]
+  }
+]

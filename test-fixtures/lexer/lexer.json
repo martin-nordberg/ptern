@@ -1,0 +1,76 @@
+[
+  { "id": "empty",               "input": "",               "expect": [] },
+  { "id": "single_quoted",       "input": "'hello'",        "expect": [{"kind":"singleQuotedLiteral","content":"hello"}] },
+  { "id": "double_quoted",       "input": "\"world\"",      "expect": [{"kind":"doubleQuotedLiteral","content":"world"}] },
+  { "id": "escaped_single_quote","input": "'it\\'s'",       "expect": [{"kind":"singleQuotedLiteral","content":"it\\'s"}] },
+  { "id": "unicode_escape",      "input": "'\\u0041'",      "expect": [{"kind":"singleQuotedLiteral","content":"\\u0041"}] },
+  { "id": "char_class_digit",    "input": "%Digit",         "expect": [{"kind":"characterClass","name":"Digit"}] },
+  { "id": "char_class_L",        "input": "%L",             "expect": [{"kind":"characterClass","name":"L"}] },
+  { "id": "integer",             "input": "42",             "expect": [{"kind":"integer","value":42}] },
+  { "id": "range_operator",      "input": "..",             "expect": [{"kind":"rangeOperator"}] },
+  { "id": "question_mark",       "input": "?",              "expect": [{"kind":"questionMark"}] },
+  { "id": "bang",                "input": "!",              "expect": [{"kind":"bang"}] },
+  { "id": "keyword_as",          "input": "as",             "expect": [{"kind":"as"}] },
+  { "id": "keyword_excluding",   "input": "excluding",      "expect": [{"kind":"excluding"}] },
+  { "id": "keyword_fewest",      "input": "fewest",         "expect": [{"kind":"fewest"}] },
+  { "id": "keyword_true",        "input": "true",           "expect": [{"kind":"true"}] },
+  { "id": "keyword_false",       "input": "false",          "expect": [{"kind":"false"}] },
+  { "id": "identifier",          "input": "my-pattern",     "expect": [{"kind":"identifier","name":"my-pattern"}] },
+  { "id": "fewest_not_prefix",   "input": "fewest-more",    "expect": [{"kind":"identifier","name":"fewest-more"}] },
+
+  { "id": "operators", "input": "*|=;{}()", "expect": [
+    {"kind":"asterisk"},{"kind":"alternativeOperator"},{"kind":"equals"},{"kind":"semicolon"},
+    {"kind":"leftBrace"},{"kind":"rightBrace"},{"kind":"leftParen"},{"kind":"rightParen"}
+  ]},
+
+  { "id": "whitespace_collapses", "input": "a   b", "expect": [
+    {"kind":"identifier","name":"a"},
+    {"kind":"whitespace","hasBlankLine":false},
+    {"kind":"identifier","name":"b"}
+  ]},
+  { "id": "single_newline", "input": "'a'\n'b'", "expect": [
+    {"kind":"singleQuotedLiteral","content":"a"},
+    {"kind":"whitespace","hasBlankLine":false},
+    {"kind":"singleQuotedLiteral","content":"b"}
+  ]},
+  { "id": "blank_line", "input": "'a'\n\n'b'", "expect": [
+    {"kind":"singleQuotedLiteral","content":"a"},
+    {"kind":"whitespace","hasBlankLine":true},
+    {"kind":"singleQuotedLiteral","content":"b"}
+  ]},
+  { "id": "comment_then_token", "input": "# a comment\n'x'", "expect": [
+    {"kind":"comment","content":" a comment"},
+    {"kind":"whitespace","hasBlankLine":false},
+    {"kind":"singleQuotedLiteral","content":"x"}
+  ]},
+  { "id": "comment_at_end", "input": "# no newline", "expect": [
+    {"kind":"comment","content":" no newline"}
+  ]},
+
+  { "id": "pos_word_start", "input": "@word-start", "expect": [{"kind":"positionAssertion","name":"word-start"}] },
+  { "id": "pos_word_end",   "input": "@word-end",   "expect": [{"kind":"positionAssertion","name":"word-end"}] },
+  { "id": "pos_line_start", "input": "@line-start", "expect": [{"kind":"positionAssertion","name":"line-start"}] },
+  { "id": "pos_line_end",   "input": "@line-end",   "expect": [{"kind":"positionAssertion","name":"line-end"}] },
+
+  { "id": "unbounded_rep", "input": "%Digit * 1..?", "expect": [
+    {"kind":"characterClass","name":"Digit"},
+    {"kind":"whitespace","hasBlankLine":false},
+    {"kind":"asterisk"},
+    {"kind":"whitespace","hasBlankLine":false},
+    {"kind":"integer","value":1},
+    {"kind":"rangeOperator"},
+    {"kind":"questionMark"}
+  ]},
+  { "id": "annotation", "input": "!case-insensitive = true", "expect": [
+    {"kind":"bang"},
+    {"kind":"identifier","name":"case-insensitive"},
+    {"kind":"whitespace","hasBlankLine":false},
+    {"kind":"equals"},
+    {"kind":"whitespace","hasBlankLine":false},
+    {"kind":"true"}
+  ]},
+
+  { "id": "error_inline_comment",     "input": "'x' # inline",    "expect": {"error":"inlineComment"} },
+  { "id": "error_inline_comment_mid", "input": "%Digit # oops",    "expect": {"error":"inlineComment"} },
+  { "id": "error_bare_at",            "input": "@",                "expect": {"error":"unexpectedCharacter"} }
+]

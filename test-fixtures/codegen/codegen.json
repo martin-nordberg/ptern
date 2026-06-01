@@ -1,0 +1,95 @@
+[
+  { "id": "default_flags",               "pattern": "'x'",                                            "expect": { "source": "x",                                             "flags": "v" } },
+  { "id": "case_insensitive_adds_i",     "pattern": "!case-insensitive = true\n'x'",                 "expect": { "source": "x",                                             "flags": "vi" } },
+  { "id": "case_insensitive_false",      "pattern": "!case-insensitive = false\n'x'",                "expect": { "source": "x",                                             "flags": "v" } },
+  { "id": "multiline_adds_m",            "pattern": "!multiline = true\n'x'",                        "expect": { "source": "x",                                             "flags": "vm" } },
+  { "id": "multiline_and_case_i",        "pattern": "!multiline = true\n!case-insensitive = true\n'x'", "expect": { "source": "x",                                          "flags": "vim" } },
+  { "id": "line_start_auto_m",           "pattern": "@line-start %Alpha * 1..?",                     "expect": { "source": "^[A-Za-z]+",                                    "flags": "vm" } },
+  { "id": "line_end_auto_m",             "pattern": "%Alpha * 1..? @line-end",                       "expect": { "source": "[A-Za-z]+$",                                    "flags": "vm" } },
+  { "id": "word_boundary_no_m",          "pattern": "@word-start %Alpha * 1..? @word-end",           "expect": { "source": "\\b[A-Za-z]+\\b",                               "flags": "v" } },
+  { "id": "line_boundary_in_def",        "pattern": "row = @line-start %Alpha * 1..? @line-end; {row}", "expect": { "source": "(?:^[A-Za-z]+$)",                            "flags": "vm" } },
+
+  { "id": "plain_literal",              "pattern": "'hello'",                                         "expect": { "source": "hello",                                         "flags": "v" } },
+  { "id": "literal_dot_escaped",        "pattern": "'a.b'",                                          "expect": { "source": "a\\.b",                                         "flags": "v" } },
+  { "id": "literal_parens_escaped",     "pattern": "'(x)'",                                          "expect": { "source": "\\(x\\)",                                       "flags": "v" } },
+  { "id": "literal_pipe_escaped",       "pattern": "'a|b'",                                          "expect": { "source": "a\\|b",                                         "flags": "v" } },
+  { "id": "literal_star_escaped",       "pattern": "'a*'",                                           "expect": { "source": "a\\*",                                          "flags": "v" } },
+  { "id": "literal_backslash",          "pattern": "'\\\\'",                                         "expect": { "source": "\\\\",                                          "flags": "v" } },
+  { "id": "literal_newline_escape",     "pattern": "'\\n'",                                          "expect": { "source": "\\n",                                           "flags": "v" } },
+  { "id": "literal_tab_escape",         "pattern": "'\\t'",                                          "expect": { "source": "\\t",                                           "flags": "v" } },
+  { "id": "literal_single_quote",       "pattern": "'it\\'s'",                                       "expect": { "source": "it's",                                          "flags": "v" } },
+  { "id": "literal_unicode_escape",     "pattern": "'\\u0041'",                                      "expect": { "source": "\\u0041",                                       "flags": "v" } },
+
+  { "id": "charclass_digit",            "pattern": "%Digit",                                          "expect": { "source": "[0-9]",                                         "flags": "v" } },
+  { "id": "charclass_alpha",            "pattern": "%Alpha",                                          "expect": { "source": "[A-Za-z]",                                      "flags": "v" } },
+  { "id": "charclass_alnum",            "pattern": "%Alnum",                                          "expect": { "source": "[A-Za-z0-9]",                                   "flags": "v" } },
+  { "id": "charclass_lower",            "pattern": "%Lower",                                          "expect": { "source": "[a-z]",                                         "flags": "v" } },
+  { "id": "charclass_upper",            "pattern": "%Upper",                                          "expect": { "source": "[A-Z]",                                         "flags": "v" } },
+  { "id": "charclass_word",             "pattern": "%Word",                                           "expect": { "source": "[A-Za-z0-9_]",                                  "flags": "v" } },
+  { "id": "charclass_xdigit",           "pattern": "%Xdigit",                                         "expect": { "source": "[0-9A-Fa-f]",                                   "flags": "v" } },
+  { "id": "charclass_any",              "pattern": "%Any",                                            "expect": { "source": "[\\s\\S]",                                      "flags": "v" } },
+  { "id": "charclass_L",                "pattern": "%L",                                              "expect": { "source": "\\p{L}",                                        "flags": "v" } },
+  { "id": "charclass_Letter",           "pattern": "%Letter",                                         "expect": { "source": "\\p{L}",                                        "flags": "v" } },
+  { "id": "charclass_Ll",               "pattern": "%Ll",                                             "expect": { "source": "\\p{Ll}",                                       "flags": "v" } },
+  { "id": "charclass_N",                "pattern": "%N",                                              "expect": { "source": "\\p{N}",                                        "flags": "v" } },
+
+  { "id": "range_az",                   "pattern": "'a'..'z'",                                        "expect": { "source": "[a-z]",                                         "flags": "v" } },
+  { "id": "range_09",                   "pattern": "'0'..'9'",                                        "expect": { "source": "[0-9]",                                         "flags": "v" } },
+
+  { "id": "rep_exact",                  "pattern": "%Digit * 4",                                      "expect": { "source": "[0-9]{4}",                                      "flags": "v" } },
+  { "id": "rep_bounded",                "pattern": "%Digit * 1..10",                                  "expect": { "source": "[0-9]{1,10}",                                   "flags": "v" } },
+  { "id": "rep_plus",                   "pattern": "%Digit * 1..?",                                   "expect": { "source": "[0-9]+",                                        "flags": "v" } },
+  { "id": "rep_star",                   "pattern": "%Digit * 0..?",                                   "expect": { "source": "[0-9]*",                                        "flags": "v" } },
+  { "id": "rep_optional",               "pattern": "%Digit * 0..1",                                   "expect": { "source": "[0-9]?",                                        "flags": "v" } },
+  { "id": "rep_multichar_wrap",         "pattern": "'ab' * 3",                                        "expect": { "source": "(?:ab){3}",                                     "flags": "v" } },
+  { "id": "rep_group",                  "pattern": "('a' | 'b') * 3",                                 "expect": { "source": "(?:[ab]){3}",                                   "flags": "v" } },
+
+  { "id": "seq_literals",               "pattern": "'a' 'b' 'c'",                                     "expect": { "source": "abc",                                           "flags": "v" } },
+  { "id": "seq_mixed",                  "pattern": "'x' %Digit",                                      "expect": { "source": "x[0-9]",                                        "flags": "v" } },
+  { "id": "alt_two_merge",              "pattern": "'a' | 'b'",                                       "expect": { "source": "[ab]",                                          "flags": "v" } },
+  { "id": "alt_three_merge",            "pattern": "'a' | 'b' | 'c'",                                 "expect": { "source": "[abc]",                                         "flags": "v" } },
+
+  { "id": "named_capture",              "pattern": "%Digit * 4 as year",                              "expect": { "source": "(?<year>[0-9]{4})",                             "flags": "v" } },
+  { "id": "named_capture_literal",      "pattern": "'hello' as greeting",                             "expect": { "source": "(?<greeting>hello)",                            "flags": "v" } },
+
+  { "id": "excl_digit_range",           "pattern": "%Digit excluding '8'..'9'",                       "expect": { "source": "[[0-9]--[8-9]]",                                "flags": "v" } },
+  { "id": "excl_alpha_char",            "pattern": "%Alpha excluding 'x'",                            "expect": { "source": "[[A-Za-z]--[x]]",                               "flags": "v" } },
+  { "id": "excl_range_char",            "pattern": "'a'..'z' excluding 'x'",                         "expect": { "source": "[[a-z]--[x]]",                                  "flags": "v" } },
+  { "id": "excl_group_chars",           "pattern": "%Digit excluding ('1'|'3'|'5'|'7'|'9')",         "expect": { "source": "[[0-9]--[13579]]",                               "flags": "v" } },
+  { "id": "excl_group_range_char",      "pattern": "%Alpha excluding ('a'..'e' | 'x')",              "expect": { "source": "[[A-Za-z]--[[a-e]x]]",                          "flags": "v" } },
+
+  { "id": "group_basic",                "pattern": "('a' | 'b')",                                     "expect": { "source": "(?:[ab])",                                      "flags": "v" } },
+  { "id": "group_nested",               "pattern": "(('a' | 'b') 'c')",                               "expect": { "source": "(?:(?:[ab])c)",                                 "flags": "v" } },
+
+  { "id": "def_interpolation",          "pattern": "d = %Digit; {d}",                                 "expect": { "source": "(?:[0-9])",                                     "flags": "v" } },
+  { "id": "def_repeated",               "pattern": "d = %Digit * 4; {d} '-' {d}",                    "expect": { "source": "(?:[0-9]{4})-(?:[0-9]{4})",                    "flags": "v" } },
+  { "id": "def_chain",                  "pattern": "a = 'x'; b = {a} 'y'; {b}",                      "expect": { "source": "(?:(?:x)y)",                                    "flags": "v" } },
+  { "id": "def_with_capture",           "pattern": "yyyy = %Digit * 4; {yyyy} as year",              "expect": { "source": "(?<year>(?:[0-9]{4}))",                         "flags": "v" } },
+
+  { "id": "pos_word_start",             "pattern": "@word-start %Alpha * 1..?",                       "expect": { "source": "\\b[A-Za-z]+",                                  "flags": "v" } },
+  { "id": "pos_word_end",               "pattern": "%Alpha * 1..? @word-end",                         "expect": { "source": "[A-Za-z]+\\b",                                  "flags": "v" } },
+  { "id": "pos_both_word",              "pattern": "@word-start %Alpha * 1..? @word-end",             "expect": { "source": "\\b[A-Za-z]+\\b",                               "flags": "v" } },
+  { "id": "pos_line_start",             "pattern": "@line-start %Digit * 1..?",                       "expect": { "source": "^[0-9]+",                                       "flags": "vm" } },
+  { "id": "pos_line_end",               "pattern": "%Digit * 1..? @line-end",                         "expect": { "source": "[0-9]+$",                                       "flags": "vm" } },
+
+  { "id": "backref_word",               "pattern": "%Alpha * 1..? as word '-' {word}",                "expect": { "source": "(?<word>[A-Za-z]+)-\\k<word>",                  "flags": "v" } },
+  { "id": "backref_after_def",          "pattern": "num = %Digit * 1..3; {num} as tag ':' {tag}",   "expect": { "source": "(?<tag>(?:[0-9]{1,3})):\\k<tag>",               "flags": "v" } },
+
+  { "id": "fewest_plus",                "pattern": "%Any * 1..? fewest",                              "expect": { "source": "[\\s\\S]+?",                                    "flags": "v" } },
+  { "id": "fewest_star",                "pattern": "%Any * 0..? fewest",                              "expect": { "source": "[\\s\\S]*?",                                    "flags": "v" } },
+  { "id": "fewest_optional",            "pattern": "%Any * 0..1 fewest",                              "expect": { "source": "[\\s\\S]??",                                    "flags": "v" } },
+  { "id": "fewest_bounded",             "pattern": "%Any * 3..10 fewest",                             "expect": { "source": "[\\s\\S]{3,10}?",                               "flags": "v" } },
+  { "id": "fewest_at_least_n",          "pattern": "%Any * 3..? fewest",                              "expect": { "source": "[\\s\\S]{3,}?",                                 "flags": "v" } },
+
+  { "id": "integration_semver",
+    "pattern": "num = %Digit * 1..10; {num} as major '.' {num} as minor '.' {num} as patch",
+    "expect": {
+      "source": "(?<major>(?:[0-9]{1,10}))\\.(?<minor>(?:[0-9]{1,10}))\\.(?<patch>(?:[0-9]{1,10}))",
+      "flags": "v"
+    }
+  },
+  { "id": "integration_zip",
+    "pattern": "%Digit * 5 ('-' %Digit * 4) * 0..1",
+    "expect": { "source": "[0-9]{5}(?:-[0-9]{4})?", "flags": "v" }
+  }
+]
