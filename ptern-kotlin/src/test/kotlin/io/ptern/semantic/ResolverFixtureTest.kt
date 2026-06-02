@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.ptern.lexer.Lexer
 import io.ptern.parser.Parser
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import java.nio.file.Paths
@@ -29,6 +30,15 @@ class ResolverFixtureTest {
                 "id=$id: expected error '$errorKind' in $errors",
             )
         }
+    }
+
+    // DuplicateCapture is reported by the raw resolver but intentionally filtered by the compile
+    // pipeline. This test documents that the raw resolver does produce the error pre-filtering.
+    @Test fun `raw resolver reports DuplicateCapture before pipeline filtering`() {
+        val tokens = Lexer.lex("'a' as x 'b' as x")
+        val parsed = Parser.parse(tokens)
+        val errors = Resolver.resolve(parsed)
+        assertTrue(errors.any { it is SemanticError.DuplicateCapture && it.name == "x" })
     }
 
     private fun matchesKind(error: SemanticError, kind: String): Boolean = when (kind) {
