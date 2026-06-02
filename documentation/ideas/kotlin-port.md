@@ -629,7 +629,7 @@ dependencies.
 
 | ID | Area | Question | Default / Options |
 |----|------|----------|-------------------|
-| TODO-1 | Kotlin version | **Which Kotlin version?** Kotlin 2.0 stabilised K2 compiler. Kotlin 2.1 is current stable. Context-receivers (useful for AST visitors) are experimental in 2.1 — avoid unless needed. | Kotlin 2.1, no experimental features |
+| ~~TODO-1~~ | Kotlin version | ~~**Which Kotlin version?**~~ — resolved: Kotlin 2.1, no experimental features. | |
 | TODO-2 | JVM target | **JVM bytecode target version?** Java 17 enables sealed classes and records at the JDK level (for Java interop). Java 21 adds pattern matching in switch for Java callers of the sealed hierarchy. | JVM target 21 recommended; set `jvmToolchain(21)` |
 | TODO-3 | Package namespace | **`io.ptern` vs `com.ptern`?** No domain is registered. `io.ptern` is conventional for open-source tools without a `.com` domain. | `io.ptern` recommended |
 | TODO-4 | Test framework | **JUnit 5 only, or also Kotest?** JUnit 5 has better Java interop and is familiar. Kotest offers a richer Kotlin DSL but adds a dependency and is less familiar to Java contributors. | JUnit 5 only — simpler, no extra dependency |
