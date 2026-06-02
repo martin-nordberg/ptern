@@ -633,8 +633,8 @@ dependencies.
 | ~~TODO-2~~ | JVM target | ~~**JVM bytecode target version?**~~ — resolved: JVM 21 minimum; `jvmToolchain(21)`. | |
 | ~~TODO-3~~ | Package namespace | ~~**`io.ptern` vs `com.ptern`?**~~ — resolved: `io.ptern`. | |
 | ~~TODO-4~~ | Test framework | ~~**JUnit 5 only, or also Kotest?**~~ — resolved: JUnit 5 only. | |
-| TODO-5 | `@Nullable` source | **Which `@Nullable` annotation?** Options: `org.jetbrains.annotations.Nullable` (JetBrains, included in IntelliJ), `javax.annotation.Nullable` (JSR-305), `org.springframework.lang.Nullable`. JetBrains is the most natural in Kotlin. | `org.jetbrains.annotations.Nullable` (test/compile scope) |
-| TODO-6 | `@Nullable` on properties | **Annotate Kotlin nullable properties for Java?** Kotlin already generates `@Nullable` metadata when `org.jetbrains:annotations` is on the compile classpath; explicit annotation in source is optional. | Rely on automatic generation; add explicit `@Nullable` only for `maxLength` in public API |
+| ~~TODO-5~~ | `@Nullable` source | ~~**Which `@Nullable` annotation?**~~ — resolved: `org.jetbrains.annotations.Nullable` (compile scope). | |
+| ~~TODO-6~~ | `@Nullable` on properties | ~~**Annotate Kotlin nullable properties for Java?**~~ — resolved: rely on automatic generation from `org.jetbrains:annotations` on the compile classpath; add explicit `@Nullable` only for `maxLength` in the public API. | |
 | TODO-7 | `!case-insensitive` Unicode | **`CASE_INSENSITIVE` alone or combined with `UNICODE_CASE`?** `UNICODE_CASE` extends folding beyond ASCII, which is correct for patterns containing Unicode range endpoints. | `RegexOption.IGNORE_CASE` (wraps both flags in Kotlin stdlib) |
 | TODO-8 | `%Any` codegen | **`[\s\S]` or `(?s:.)`?** `[\s\S]` works inside and outside character class context and matches the TypeScript behaviour. | `[\s\S]` — consistent with TypeScript edition |
 | TODO-9 | `UNICODE_CHARACTER_CLASS` flag | **Apply `Pattern.UNICODE_CHARACTER_CLASS` globally?** Ptern's codegen emits explicit `\p{...}` classes rather than `\d`/`\w`/`\s`, so this flag has no effect on generated patterns. | Omit — not needed |
