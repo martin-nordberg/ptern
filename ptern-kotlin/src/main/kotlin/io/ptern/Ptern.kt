@@ -3,6 +3,8 @@ package io.ptern
 import io.ptern.codegen.RepetitionInfo
 import io.ptern.codegen.SubstitutionPlan
 import io.ptern.codegen.compile
+import io.ptern.formatter.FormatOptions
+import io.ptern.formatter.formatPtern
 import io.ptern.lexer.LexException
 import io.ptern.parser.ast.ParseException
 import io.ptern.runtime.Replacer
@@ -34,6 +36,10 @@ class Ptern private constructor(
     private val captureValidators: List<Pair<String, String>>,
 ) {
     companion object {
+        @JvmStatic
+        fun format(source: String, options: FormatOptions = FormatOptions()): String =
+            formatPtern(source, options)
+
         @JvmStatic
         fun compile(pattern: String): Ptern {
             // 1. Lex
