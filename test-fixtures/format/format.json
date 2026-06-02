@@ -111,5 +111,9 @@
     "expect": "'hello' 'world'" },
   { "id": "idempotent_with_anns_defs",
     "input": "!case-insensitive = true\n!multiline = false\n\nword = %Alpha * 1..? ;\n\n{word}",
-    "expect": "!case-insensitive = true\n!multiline        = false\n\nword  = %Alpha * 1..? ;\n\n{word}" }
+    "expect": "!case-insensitive = true\n!multiline        = false\n\nword  = %Alpha * 1..? ;\n\n{word}" },
+
+  { "id": "lex_error_unterminated",   "input": "'unterminated",                        "expect": {"error": "lexError"} },
+  { "id": "comment_verbatim_trailing","input": "#  two spaces  and trailing  \n'x'",   "expect": "#  two spaces  and trailing  \n'x'" },
+  { "id": "idempotent_comments",      "input": "# comment\n\n# about body\n'x'",       "expect": "# comment\n\n# about body\n'x'" }
 ]

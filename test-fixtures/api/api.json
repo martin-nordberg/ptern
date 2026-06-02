@@ -293,5 +293,13 @@
       { "op": "matchNextIn", "input": "xyzx", "startIndex": 1, "expect": {"index":3,"length":1,"captures":{}} },
       { "op": "matchNextIn", "input": "xyzx", "startIndex": 4, "expect": null }
     ]
+  },
+  {
+    "id": "bounds_bounded_rep",
+    "pattern": "%Digit * 2..5",
+    "cases": [
+      { "op": "minLength", "expect": 2 },
+      { "op": "maxLength", "expect": 5 }
+    ]
   }
 ]

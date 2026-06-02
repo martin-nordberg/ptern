@@ -44,5 +44,56 @@
   { "id": "invalid_excl_literal_body", "pattern": "greeting = 'hello';\n%Alpha excluding {greeting}", "expect": {"error": "invalidExclusionOperand"} },
 
   { "id": "subst_ignore_without_subst","pattern": "!substitutions-ignore-matching = true\n'x'", "expect": {"error": "substitutionsIgnoreMatchingWithoutSubstitutable"} },
-  { "id": "not_substitutable_body",    "pattern": "!substitutable = true\n%Digit",              "expect": {"error": "notSubstitutableBody"} }
+  { "id": "not_substitutable_body",    "pattern": "!substitutable = true\n%Digit",              "expect": {"error": "notSubstitutableBody"} },
+
+  { "id": "multiple_invalid_escapes",  "pattern": "'\\q\\p'",                                   "expect": {"error": "invalidEscapeSequence"} },
+
+  { "id": "equal_bounds_valid",        "pattern": "%Digit * 3..3",                              "expect": "ok" },
+
+  { "id": "range_excl_same_range",     "pattern": "'a'..'z' excluding 'a'..'z'",               "expect": {"error": "emptyCharacterSet"} },
+  { "id": "valid_excl_group_single_alt","pattern": "'a'..'z' excluding ('a')",                  "expect": "ok" },
+  { "id": "valid_excl_interp_grouped", "pattern": "oddDigit = ('1'|'3'|'5'|'7'|'9');\n%Digit excluding {oddDigit}", "expect": "ok" },
+  { "id": "valid_excl_interp_flat",    "pattern": "odds = '1'|'3'|'5';\n%Digit excluding {odds}",                  "expect": "ok" },
+  { "id": "invalid_excl_multi_seq",    "pattern": "'a'..'z' excluding ('a' 'b')",               "expect": {"error": "invalidExclusionOperand"} },
+  { "id": "invalid_excl_nested_group", "pattern": "%Digit excluding (('1'))",                    "expect": {"error": "invalidExclusionOperand"} },
+  { "id": "invalid_excl_interp_multi", "pattern": "d = 'a' 'b'; %Alpha excluding {d}",          "expect": {"error": "invalidExclusionOperand"} },
+  { "id": "invalid_excl_group_interp", "pattern": "d = '1'; %Digit excluding ({d})",             "expect": {"error": "invalidExclusionOperand"} },
+
+  { "id": "valid_replacements_ignore", "pattern": "!replacements-ignore-matching = true\n'x'",  "expect": "ok" },
+  { "id": "valid_multiline",           "pattern": "!multiline = true\n'x'",                      "expect": "ok" },
+
+  { "id": "valid_capture_in_rep",      "pattern": "(%Digit as d) * 3",                           "expect": "ok" },
+  { "id": "valid_capture_outside_rep", "pattern": "%Digit * 3 as d",                             "expect": "ok" },
+  { "id": "valid_nested_capture_rep",  "pattern": "(('a' as inner) * 2) * 3",                    "expect": "ok" },
+
+  { "id": "valid_pos_word_start",      "pattern": "@word-start %Alpha * 1..?",                   "expect": "ok" },
+  { "id": "valid_pos_word_end",        "pattern": "%Alpha * 1..? @word-end",                     "expect": "ok" },
+  { "id": "valid_pos_line_start",      "pattern": "@line-start %Digit * 1..?",                   "expect": "ok" },
+  { "id": "valid_pos_line_end",        "pattern": "%Digit * 1..? @line-end",                     "expect": "ok" },
+  { "id": "unknown_pos_start_of_line", "pattern": "@start-of-line 'x'",                          "expect": {"error": "unknownPositionAssertion"} },
+  { "id": "pos_in_rep_count_1",        "pattern": "@line-end * 1",                               "expect": {"error": "positionAssertionInRepetition"} },
+
+  { "id": "valid_subst_literal",       "pattern": "!substitutable = true\n'hello'",              "expect": "ok" },
+  { "id": "valid_subst_capture_class", "pattern": "!substitutable = true\n%Digit * 4 as year",  "expect": "ok" },
+  { "id": "invalid_subst_bare_charrange","pattern": "!substitutable = true\n'a'..'z'",           "expect": {"error": "notSubstitutableBody"} },
+  { "id": "valid_subst_group_literal", "pattern": "!substitutable = true\n('hello')",            "expect": "ok" },
+  { "id": "valid_subst_alt_literals",  "pattern": "!substitutable = true\n'foo' | 'bar'",        "expect": "ok" },
+  { "id": "invalid_subst_alt_mixed",   "pattern": "!substitutable = true\n'foo' | %Digit",       "expect": {"error": "notSubstitutableBody"} },
+  { "id": "valid_subst_seq_literals",  "pattern": "!substitutable = true\n'hello' ' ' 'world'",  "expect": "ok" },
+  { "id": "invalid_subst_seq_mixed",   "pattern": "!substitutable = true\n'hello' %Digit",       "expect": {"error": "notSubstitutableBody"} },
+  { "id": "valid_subst_fixed_rep",     "pattern": "!substitutable = true\n'x' * 3",              "expect": "ok" },
+  { "id": "valid_subst_bounded_cap",   "pattern": "!substitutable = true\n%Digit * 1..4 as d",   "expect": "ok" },
+  { "id": "invalid_subst_bounded_nocap","pattern": "!substitutable = true\n%Digit * 1..4",       "expect": {"error": "boundedRepetitionNeedsCapture"} },
+  { "id": "valid_subst_group_bounded_cap","pattern": "!substitutable = true\n(',' %Digit * 1..4 as d) * 0..10", "expect": "ok" },
+  { "id": "valid_subst_interp_lit_def","pattern": "!substitutable = true\nword = 'hello';\n{word}", "expect": "ok" },
+  { "id": "invalid_subst_interp_class","pattern": "!substitutable = true\ndigits = %Digit * 4;\n{digits}", "expect": {"error": "notSubstitutableBody"} },
+  { "id": "valid_subst_interp_outer_cap","pattern": "!substitutable = true\ndigits = %Digit * 4;\n{digits} as year", "expect": "ok" },
+  { "id": "valid_subst_ignore_with_subst","pattern": "!substitutable = true\n!substitutions-ignore-matching = true\n'hello'", "expect": "ok" },
+  { "id": "valid_subst_ignore_false",  "pattern": "!substitutions-ignore-matching = false\n'hello'", "expect": "ok" },
+
+  { "id": "fewest_on_count_1",         "pattern": "'x' * 1 fewest",                             "expect": {"error": "fewestOnExactRepetition"} },
+  { "id": "valid_fewest_unbounded",     "pattern": "%Any * 1..? fewest",                         "expect": "ok" },
+  { "id": "valid_fewest_zero_unbounded","pattern": "%Any * 0..? fewest",                         "expect": "ok" },
+  { "id": "valid_fewest_bounded",       "pattern": "%Any * 3..10 fewest",                        "expect": "ok" },
+  { "id": "valid_fewest_optional",      "pattern": "%Any * 0..1 fewest",                         "expect": "ok" }
 ]

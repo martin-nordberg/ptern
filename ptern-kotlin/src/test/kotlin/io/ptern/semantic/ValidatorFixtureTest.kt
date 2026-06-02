@@ -45,6 +45,7 @@ class ValidatorFixtureTest {
         "invalidExclusionOperand" -> error is SemanticError.InvalidExclusionOperand
         "substitutionsIgnoreMatchingWithoutSubstitutable" -> error is SemanticError.SubstitutionsIgnoreMatchingWithoutSubstitutable
         "notSubstitutableBody" -> error is SemanticError.NotSubstitutableBody
+        "boundedRepetitionNeedsCapture" -> error is SemanticError.BoundedRepetitionNeedsCapture
         else -> false
     }
 

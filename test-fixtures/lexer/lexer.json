@@ -72,5 +72,18 @@
 
   { "id": "error_inline_comment",     "input": "'x' # inline",    "expect": {"error":"inlineComment"} },
   { "id": "error_inline_comment_mid", "input": "%Digit # oops",    "expect": {"error":"inlineComment"} },
-  { "id": "error_bare_at",            "input": "@",                "expect": {"error":"unexpectedCharacter"} }
+  { "id": "error_bare_at",            "input": "@",                "expect": {"error":"unexpectedCharacter"} },
+
+  { "id": "unicode_single_quoted",    "input": "'café'",           "expect": [{"kind":"singleQuotedLiteral","content":"café"}] },
+  { "id": "unicode_double_quoted",    "input": "\"naïve\"",        "expect": [{"kind":"doubleQuotedLiteral","content":"naïve"}] },
+  { "id": "cjk_string",              "input": "'日本語'",           "expect": [{"kind":"singleQuotedLiteral","content":"日本語"}] },
+  { "id": "emoji_string",            "input": "'🎉'",              "expect": [{"kind":"singleQuotedLiteral","content":"🎉"}] },
+  { "id": "mixed_unicode",           "input": "'abc défg'",        "expect": [{"kind":"singleQuotedLiteral","content":"abc défg"}] },
+  { "id": "comment_after_blank_line","input": "# ptern doc\n\n'x'","expect": [{"kind":"comment","content":" ptern doc"},{"kind":"whitespace","hasBlankLine":true},{"kind":"singleQuotedLiteral","content":"x"}] },
+  { "id": "blank_line_with_spaces",  "input": "'a'\n   \n'b'",    "expect": [{"kind":"singleQuotedLiteral","content":"a"},{"kind":"whitespace","hasBlankLine":true},{"kind":"singleQuotedLiteral","content":"b"}] },
+  { "id": "bounded_repetition",      "input": "'*' * 3..10",       "expect": [{"kind":"singleQuotedLiteral","content":"*"},{"kind":"whitespace","hasBlankLine":false},{"kind":"asterisk"},{"kind":"whitespace","hasBlankLine":false},{"kind":"integer","value":3},{"kind":"rangeOperator"},{"kind":"integer","value":10}] },
+  { "id": "definition",             "input": "yyyy = %Digit * 4;", "expect": [{"kind":"identifier","name":"yyyy"},{"kind":"whitespace","hasBlankLine":false},{"kind":"equals"},{"kind":"whitespace","hasBlankLine":false},{"kind":"characterClass","name":"Digit"},{"kind":"whitespace","hasBlankLine":false},{"kind":"asterisk"},{"kind":"whitespace","hasBlankLine":false},{"kind":"integer","value":4},{"kind":"semicolon"}] },
+  { "id": "alternatives",           "input": "'a' | 'b'",          "expect": [{"kind":"singleQuotedLiteral","content":"a"},{"kind":"whitespace","hasBlankLine":false},{"kind":"alternativeOperator"},{"kind":"whitespace","hasBlankLine":false},{"kind":"singleQuotedLiteral","content":"b"}] },
+  { "id": "excluding_expression",   "input": "%Digit excluding '8'..'9'", "expect": [{"kind":"characterClass","name":"Digit"},{"kind":"whitespace","hasBlankLine":false},{"kind":"excluding"},{"kind":"whitespace","hasBlankLine":false},{"kind":"singleQuotedLiteral","content":"8"},{"kind":"rangeOperator"},{"kind":"singleQuotedLiteral","content":"9"}] },
+  { "id": "pos_sequence",           "input": "@word-start %Alpha @word-end", "expect": [{"kind":"positionAssertion","name":"word-start"},{"kind":"whitespace","hasBlankLine":false},{"kind":"characterClass","name":"Alpha"},{"kind":"whitespace","hasBlankLine":false},{"kind":"positionAssertion","name":"word-end"}] }
 ]

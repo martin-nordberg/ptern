@@ -15,5 +15,12 @@
 
   { "id": "capture_def_conflict",      "pattern": "x = 'a' ; {x} as x",                        "expect": {"error": "captureDefinitionConflict"} },
 
-  { "id": "unused_definition",         "pattern": "foo = 'a' ; bar = 'b' ; {foo}",              "expect": {"error": "unusedDefinition"} }
+  { "id": "unused_definition",         "pattern": "foo = 'a' ; bar = 'b' ; {foo}",              "expect": {"error": "unusedDefinition"} },
+
+  { "id": "self_reference",            "pattern": "a = {a} ; {a}",                             "expect": {"error": "circularDefinition"} },
+  { "id": "dup_def_three",             "pattern": "d = 'a' ; d = 'b' ; d = 'c' ; {d}",        "expect": {"error": "duplicateDefinition"} },
+  { "id": "capture_inside_def_name",   "pattern": "year = %Digit * 4 as year ; {year}",        "expect": {"error": "captureDefinitionConflict"} },
+  { "id": "chain_neither_reachable",   "pattern": "a = 'x' ; b = {a} ; 'y'",                  "expect": {"error": "unusedDefinition"} },
+  { "id": "chain_transitively_ok",     "pattern": "a = 'x' ; b = {a} 'y' ; {b}",              "expect": "ok" },
+  { "id": "multiple_defs_ok",          "pattern": "a = 'x' ; b = 'y' ; {a} {b}",              "expect": "ok" }
 ]
