@@ -71,6 +71,16 @@ pub fn matches_all_of_rejects_partial_test() {
   ptern.matches_all_of(p, "hello world") |> should.be_false
 }
 
+pub fn matches_all_of_empty_string_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.matches_all_of(p, "") |> should.be_false
+}
+
+pub fn matches_all_of_case_sensitive_by_default_test() {
+  let assert Ok(p) = ptern.compile("'hello'")
+  ptern.matches_all_of(p, "HELLO") |> should.be_false
+}
+
 pub fn matches_start_of_test() {
   let assert Ok(p) = ptern.compile("'hello'")
   ptern.matches_start_of(p, "hello world") |> should.be_true
@@ -114,6 +124,12 @@ pub fn digit_pattern_matches_all_of_test() {
 pub fn digit_pattern_rejects_letters_test() {
   let assert Ok(p) = ptern.compile("%Digit * 4")
   ptern.matches_all_of(p, "abcd") |> should.be_false
+}
+
+pub fn digit_class_single_char_test() {
+  let assert Ok(p) = ptern.compile("%Digit")
+  ptern.matches_all_of(p, "5") |> should.be_true
+  ptern.matches_all_of(p, "a") |> should.be_false
 }
 
 pub fn alternation_matches_either_test() {
@@ -325,6 +341,12 @@ pub fn min_length_definition_interpolation_test() {
 pub fn max_length_definition_interpolation_test() {
   let assert Ok(p) = ptern.compile("d = %Digit * 4; {d}")
   ptern.max_length(p) |> should.equal(Some(4))
+}
+
+pub fn min_length_sequence_with_optional_group_test() {
+  let assert Ok(p) = ptern.compile("'a' ('b') * 0..1")
+  ptern.min_length(p) |> should.equal(1)
+  ptern.max_length(p) |> should.equal(Some(2))
 }
 
 // ---------------------------------------------------------------------------

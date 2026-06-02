@@ -3,8 +3,8 @@ import lexer/lexer
 import parser/ast.{
   Alternation, Annotation, Capture, CharClass, CharRange, Definition, Exact,
   Exclusion, Group, Interpolation, Literal, None as RepNone, OrphanedComment,
-  ParsedPtern, RepCount, Repetition, Sequence, SingleAtom, TrailingComment,
-  Unbounded, UnexpectedEndOfInput, UnexpectedToken,
+  ParsedPtern, PositionAssertion, RepCount, Repetition, Sequence, SingleAtom,
+  TrailingComment, Unbounded, UnexpectedEndOfInput, UnexpectedToken,
 }
 import parser/parser
 import gleeunit/should
@@ -75,6 +75,11 @@ pub fn parse_group_test() {
       )),
     ),
   )
+}
+
+pub fn parse_position_assertion_test() {
+  parse("@word-start")
+  |> should.equal(Ok(simple_atom(PositionAssertion("word-start"))))
 }
 
 // ---------------------------------------------------------------------------

@@ -60,6 +60,11 @@ pub fn lex_error_propagated_test() {
   |> should.be_error
 }
 
+pub fn lex_error_unexpected_char_test() {
+  formatter.format("@", default_format_options())
+  |> should.be_error
+}
+
 pub fn parse_error_propagated_test() {
   formatter.format("* 3", default_format_options())
   |> should.be_error
