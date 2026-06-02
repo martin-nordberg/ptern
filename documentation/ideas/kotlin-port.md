@@ -644,7 +644,7 @@ dependencies.
 | ~~TODO-13~~ | Coroutines | ~~**Should any API be suspendable?**~~ — resolved: synchronous only, no `suspend` functions. | |
 | ~~TODO-14~~ | Kotlin multiplatform | ~~**Kotlin/Native or Kotlin/JS future?**~~ — resolved: out of scope; note in README. | |
 | ~~TODO-15~~ | Maven coordinates | ~~**Artifact ID for Maven Central?**~~ — resolved: `io.ptern:ptern-kotlin`. | |
-| TODO-16 | Backreference syntax | **Confirm `\k<name>` works in `java.util.regex`?** Java 7+ supports `\k<name>` for named backreferences. Add a fixture test covering patterns with backreferences (e.g. HTML tag matching example). | Should work — verify in Phase 2 |
+| ~~TODO-16~~ | Backreference syntax | ~~**Confirm `\k<name>` works in `java.util.regex`?**~~ — resolved: use `\k<name>`; add a fixture test covering backreferences (e.g. HTML tag matching example) in Phase 2. | |
 
 ---
 
