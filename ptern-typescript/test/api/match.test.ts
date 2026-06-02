@@ -332,6 +332,12 @@ describe("minLength / maxLength", () => {
     expect(p.minLength()).toBe(4);
     expect(p.maxLength()).toBe(4);
   });
+
+  it("multiline annotation does not affect length bounds", () => {
+    const p = compile("!multiline = true\n%Alpha * 1..?");
+    expect(p.minLength()).toBe(1);
+    expect(p.maxLength()).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

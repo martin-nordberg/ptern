@@ -284,6 +284,14 @@ describe("doc comments", () => {
     expect(result.annotations[0]!.comments).toContain(" flag comment");
   });
 
+  it("ptern-level and annotation comments both parsed correctly", () => {
+    const result = parseInput("# ptern doc\n\n# ann doc\n!case-insensitive = true\n'x'");
+    if (isError(result)) throw new Error("unexpected error");
+    expect(result.pternComments).toContain(" ptern doc");
+    expect(result.annotations[0]!.comments).toContain(" ann doc");
+    expect(result.bodyComments).toHaveLength(0);
+  });
+
   it("definition comment stored on definition", () => {
     const result = parseInput("# about word\nword = %Alpha * 1..? ;\n\n{word}");
     if (isError(result)) throw new Error("unexpected error");

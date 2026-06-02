@@ -287,6 +287,10 @@ describe("doc comments", () => {
     expect(fmt("# describes the body\n'x'")).toBe("# describes the body\n'x'");
   });
 
+  it("body comment with longer literal", () => {
+    expect(fmt("# about body\n'hello'")).toBe("# about body\n'hello'");
+  });
+
   it("annotation comment", () => {
     expect(fmt("# flag\n!multiline = true\n'x'")).toBe("# flag\n!multiline = true\n\n'x'");
   });
