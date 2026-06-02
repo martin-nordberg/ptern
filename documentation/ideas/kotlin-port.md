@@ -520,7 +520,7 @@ interop; no extra annotations are needed.
 
 ```kotlin
 plugins {
-    kotlin("jvm") version "2.1.0"
+    kotlin("jvm") version "2.2.0"
     `java-library`
 }
 
@@ -629,7 +629,7 @@ dependencies.
 
 | ID | Area | Question | Default / Options |
 |----|------|----------|-------------------|
-| ~~TODO-1~~ | Kotlin version | ~~**Which Kotlin version?**~~ — resolved: Kotlin 2.1, no experimental features. | |
+| ~~TODO-1~~ | Kotlin version | ~~**Which Kotlin version?**~~ — resolved: Kotlin 2.2, no experimental features. | |
 | ~~TODO-2~~ | JVM target | ~~**JVM bytecode target version?**~~ — resolved: JVM 21 minimum; `jvmToolchain(21)`. | |
 | ~~TODO-3~~ | Package namespace | ~~**`io.ptern` vs `com.ptern`?**~~ — resolved: `io.ptern`. | |
 | ~~TODO-4~~ | Test framework | ~~**JUnit 5 only, or also Kotest?**~~ — resolved: JUnit 5 only. | |
