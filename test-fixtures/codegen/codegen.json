@@ -52,11 +52,11 @@
   { "id": "named_capture",              "pattern": "%Digit * 4 as year",                              "expect": { "source": "(?<year>[0-9]{4})",                             "flags": "v" } },
   { "id": "named_capture_literal",      "pattern": "'hello' as greeting",                             "expect": { "source": "(?<greeting>hello)",                            "flags": "v" } },
 
-  { "id": "excl_digit_range",           "pattern": "%Digit excluding '8'..'9'",                       "expect": { "source": "[[0-9]--[8-9]]",                                "flags": "v" } },
-  { "id": "excl_alpha_char",            "pattern": "%Alpha excluding 'x'",                            "expect": { "source": "[[A-Za-z]--[x]]",                               "flags": "v" } },
-  { "id": "excl_range_char",            "pattern": "'a'..'z' excluding 'x'",                         "expect": { "source": "[[a-z]--[x]]",                                  "flags": "v" } },
-  { "id": "excl_group_chars",           "pattern": "%Digit excluding ('1'|'3'|'5'|'7'|'9')",         "expect": { "source": "[[0-9]--[13579]]",                               "flags": "v" } },
-  { "id": "excl_group_range_char",      "pattern": "%Alpha excluding ('a'..'e' | 'x')",              "expect": { "source": "[[A-Za-z]--[[a-e]x]]",                          "flags": "v" } },
+  { "id": "excl_digit_range",           "pattern": "%Digit excluding '8'..'9'",                       "expect": { "source": "[[0-9]--[8-9]]",        "jvmSource": "[[0-9]&&[^8-9]]",             "flags": "v" } },
+  { "id": "excl_alpha_char",            "pattern": "%Alpha excluding 'x'",                            "expect": { "source": "[[A-Za-z]--[x]]",       "jvmSource": "[[A-Za-z]&&[^x]]",            "flags": "v" } },
+  { "id": "excl_range_char",            "pattern": "'a'..'z' excluding 'x'",                         "expect": { "source": "[[a-z]--[x]]",          "jvmSource": "[[a-z]&&[^x]]",               "flags": "v" } },
+  { "id": "excl_group_chars",           "pattern": "%Digit excluding ('1'|'3'|'5'|'7'|'9')",         "expect": { "source": "[[0-9]--[13579]]",       "jvmSource": "[[0-9]&&[^13579]]",           "flags": "v" } },
+  { "id": "excl_group_range_char",      "pattern": "%Alpha excluding ('a'..'e' | 'x')",              "expect": { "source": "[[A-Za-z]--[[a-e]x]]",  "jvmSource": "[[A-Za-z]&&[^[a-e]x]]",      "flags": "v" } },
 
   { "id": "group_basic",                "pattern": "('a' | 'b')",                                     "expect": { "source": "(?:[ab])",                                      "flags": "v" } },
   { "id": "group_nested",               "pattern": "(('a' | 'b') 'c')",                               "expect": { "source": "(?:(?:[ab])c)",                                 "flags": "v" } },
