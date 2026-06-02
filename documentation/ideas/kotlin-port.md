@@ -642,7 +642,7 @@ dependencies.
 | ~~TODO-11~~ | Synthetic group name filter | ~~**Use `syntheticGroupNames: Set<String>` on `CompiledPtern`, or a naming convention?**~~ — resolved: explicit `syntheticGroupNames: Set<String>` in `CompiledPtern`; no naming convention. | |
 | ~~TODO-12~~ | Formatter parity | ~~**Include formatter in initial release?**~~ — resolved: yes, include in Phase 5. | |
 | ~~TODO-13~~ | Coroutines | ~~**Should any API be suspendable?**~~ — resolved: synchronous only, no `suspend` functions. | |
-| TODO-14 | Kotlin multiplatform | **Kotlin/Native or Kotlin/JS future?** Out of scope for this port. Isolating `RegexEmitter` cleanly makes a KMP port easier later, but do not design for it now. | Out of scope; note in README |
+| ~~TODO-14~~ | Kotlin multiplatform | ~~**Kotlin/Native or Kotlin/JS future?**~~ — resolved: out of scope; note in README. | |
 | TODO-15 | Maven coordinates | **Artifact ID for Maven Central?** Group `io.ptern`, artifact `ptern`? `ptern-kotlin`? Explicit `-kotlin` suffix signals the JVM edition. | Resolve before Phase 5; `io.ptern:ptern-kotlin` is a reasonable default |
 | TODO-16 | Backreference syntax | **Confirm `\k<name>` works in `java.util.regex`?** Java 7+ supports `\k<name>` for named backreferences. Add a fixture test covering patterns with backreferences (e.g. HTML tag matching example). | Should work — verify in Phase 2 |
 
