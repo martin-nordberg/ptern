@@ -639,7 +639,7 @@ dependencies.
 | ~~TODO-8~~ | `%Any` codegen | ~~**`[\s\S]` or `(?s:.)`?**~~ — resolved: `[\s\S]`. | |
 | ~~TODO-9~~ | `UNICODE_CHARACTER_CLASS` flag | ~~**Apply `Pattern.UNICODE_CHARACTER_CLASS` globally?**~~ — resolved: omit; Ptern's codegen never emits `\d`/`\w`/`\s`. | |
 | ~~TODO-10~~ | `matchAllIn` empty-match guard | ~~**Confirm zero-width match behaviour matches TypeScript?**~~ — resolved: carry the bump-by-1 guard; verify against shared fixtures. | |
-| TODO-11 | Synthetic group name filter | **Use `syntheticGroupNames: Set<String>` on `CompiledPtern`, or a naming convention?** A naming convention (`rep` prefix) is simpler but fragile if capture names happen to start with `rep`. An explicit set of emitted names is unambiguous. | Explicit `syntheticGroupNames: Set<String>` in `CompiledPtern` |
+| ~~TODO-11~~ | Synthetic group name filter | ~~**Use `syntheticGroupNames: Set<String>` on `CompiledPtern`, or a naming convention?**~~ — resolved: explicit `syntheticGroupNames: Set<String>` in `CompiledPtern`; no naming convention. | |
 | TODO-12 | Formatter parity | **Include formatter in initial release?** TypeScript chose yes. | Yes — include in Phase 5 |
 | TODO-13 | Coroutines | **Should any API be suspendable?** The TypeScript edition is synchronous only. All operations are CPU-bound (no I/O). | Synchronous only — no `suspend` functions |
 | TODO-14 | Kotlin multiplatform | **Kotlin/Native or Kotlin/JS future?** Out of scope for this port. Isolating `RegexEmitter` cleanly makes a KMP port easier later, but do not design for it now. | Out of scope; note in README |
