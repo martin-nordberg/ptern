@@ -1,0 +1,40 @@
+[
+  { "id": "disjoint_branches_ok",              "pattern": "(%Digit | %Alpha) * 1..?",                              "expect": "ok" },
+  { "id": "upper_lower_disjoint_ok",           "pattern": "(%Upper | %Lower) * 1..?",                              "expect": "ok" },
+  { "id": "alpha_underscore_disjoint_ok",      "pattern": "(%Alpha | '_') * 1..?",                                 "expect": "ok" },
+  { "id": "L_N_disjoint_ok",                   "pattern": "(%L | %N) * 1..?",                                     "expect": "ok" },
+  { "id": "exact_count_ok",                    "pattern": "('a' | 'b') * 3",                                       "expect": "ok" },
+  { "id": "multichar_no_overlap_ok",           "pattern": "('ab' | 'cd') * 1..?",                                  "expect": "ok" },
+  { "id": "excl_set_disjoint_ok",              "pattern": "(%Alpha excluding 'a' | 'a') * 1..?",                   "expect": "ok" },
+
+  { "id": "overlapping_literal_branches",      "pattern": "('a' | 'ab') * 1..?",                                   "expect": {"error": "ambiguousRepetitionAdjacency"} },
+  { "id": "same_class_branches",               "pattern": "(%Digit | %Digit) * 1..?",                              "expect": {"error": "ambiguousRepetitionAdjacency"} },
+  { "id": "multichar_last_first_overlap",      "pattern": "('xy' | 'yz') * 1..?",                                  "expect": {"error": "ambiguousRepetitionAdjacency"} },
+  { "id": "three_branches_one_overlap",        "pattern": "('a' | 'b' | 'ab') * 1..?",                             "expect": {"error": "ambiguousRepetitionAdjacency"} },
+  { "id": "bounded_variable_triggers",         "pattern": "('a' | 'ab') * 2..5",                                   "expect": {"error": "ambiguousRepetitionAdjacency"} },
+
+  { "id": "variable_body_same_class",          "pattern": "(%Alpha * 1..?) * 1..?",                                "expect": {"error": "ambiguousRepetitionBody"} },
+  { "id": "variable_alt_body",                 "pattern": "((%L | %N | '_') * 1..?) * 1..?",                       "expect": {"error": "ambiguousRepetitionBody"} },
+  { "id": "excl_body_overlaps_itself",         "pattern": "((%Any excluding ',') * 1..?) * 1..?",                  "expect": {"error": "ambiguousRepetitionBody"} },
+  { "id": "nullable_inner_rep",                "pattern": "(%Digit * 0..?) * 1..?",                                "expect": {"error": "ambiguousRepetitionBody"} },
+
+  { "id": "fixed_body_ok",                     "pattern": "(%Digit) * 1..?",                                       "expect": "ok" },
+  { "id": "disjoint_endpoints_ok",             "pattern": "('x' %Digit * 1..?) * 1..?",                           "expect": "ok" },
+  { "id": "separator_makes_safe",              "pattern": "(',' (%Any excluding ',') * 1..?) * 1..?",              "expect": "ok" },
+
+  { "id": "adjacent_same_class_error",         "pattern": "%Digit * 1..? %Digit * 1..?",                           "expect": {"error": "ambiguousAdjacentRepetition"} },
+  { "id": "zero_lower_still_unbounded",        "pattern": "%Alpha * 0..? %Alpha * 1..?",                           "expect": {"error": "ambiguousAdjacentRepetition"} },
+  { "id": "backref_adjacent_same_class",       "pattern": "%Alpha * 1..? as w {w} * 1..?",                         "expect": {"error": "ambiguousAdjacentRepetition"} },
+
+  { "id": "adjacent_disjoint_ok",              "pattern": "%Upper * 1..? %Lower * 1..?",                           "expect": "ok" },
+  { "id": "literal_separator_ok",              "pattern": "%Digit * 1..? '-' %Digit * 1..?",                       "expect": "ok" },
+  { "id": "bounded_not_unbounded_ok",          "pattern": "%Alpha * 1..5 %Alpha * 1..?",                           "expect": "ok" },
+  { "id": "excl_makes_adjacent_disjoint",      "pattern": "%Digit * 1..? (%Any excluding %Digit) * 1..?",          "expect": "ok" },
+
+  { "id": "allow_backtracking_suppresses",     "pattern": "!allow-backtracking = true\n(%Alpha * 1..?) * 1..? %Alpha * 1..?", "expect": "ok" },
+  { "id": "allow_backtracking_false_checks",   "pattern": "!allow-backtracking = false\n(%Alpha * 1..?) * 1..?",   "expect": {"error": "ambiguousRepetitionBody"} },
+
+  { "id": "backref_top_level_ok",              "pattern": "%Alpha * 1..? as word '-' {word}",                      "expect": "ok" },
+  { "id": "fixed_body_with_backref_ok",        "pattern": "(%Alpha as c {c}) * 1..?",                              "expect": "ok" },
+  { "id": "backref_adjacent_disjoint_ok",      "pattern": "%Alpha * 1..? as n ' ' {n}",                            "expect": "ok" }
+]

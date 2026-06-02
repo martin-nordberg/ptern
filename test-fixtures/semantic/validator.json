@@ -1,0 +1,48 @@
+[
+  { "id": "valid_literal",             "pattern": "'hello'",                                    "expect": "ok" },
+  { "id": "valid_char_class",          "pattern": "%Digit",                                     "expect": "ok" },
+  { "id": "valid_range",               "pattern": "'a'..'z'",                                   "expect": "ok" },
+  { "id": "valid_equal_range",         "pattern": "'a'..'a'",                                   "expect": "ok" },
+  { "id": "valid_exact_rep",           "pattern": "%Digit * 4",                                 "expect": "ok" },
+  { "id": "valid_bounded_rep",         "pattern": "%Digit * 1..10",                             "expect": "ok" },
+  { "id": "valid_unbounded_rep",       "pattern": "%Digit * 1..?",                              "expect": "ok" },
+  { "id": "valid_exclusion",           "pattern": "%Digit excluding '8'..'9'",                  "expect": "ok" },
+  { "id": "valid_capture",             "pattern": "%Digit * 4 as year",                         "expect": "ok" },
+  { "id": "valid_annotation",          "pattern": "!case-insensitive = true\n'x'",              "expect": "ok" },
+  { "id": "valid_escape_sequences",    "pattern": "'\\n\\t\\r\\'\\\\'",                         "expect": "ok" },
+  { "id": "valid_unicode_escape",      "pattern": "'\\u0041'",                                  "expect": "ok" },
+  { "id": "valid_excl_charset",        "pattern": "%Digit excluding '0'",                       "expect": "ok" },
+  { "id": "valid_excl_group",          "pattern": "%Digit excluding ('1'|'3'|'5'|'7'|'9')",    "expect": "ok" },
+  { "id": "valid_excl_range_in_group", "pattern": "%Alpha excluding ('a'..'e' | 'x')",          "expect": "ok" },
+  { "id": "valid_excl_charclass",      "pattern": "%Any excluding (%Digit | 'x')",              "expect": "ok" },
+
+  { "id": "empty_literal_single",      "pattern": "''",                                         "expect": {"error": "emptyLiteral"} },
+  { "id": "empty_literal_double",      "pattern": "\"\"",                                       "expect": {"error": "emptyLiteral"} },
+  { "id": "empty_literal_in_seq",      "pattern": "'a' '' 'b'",                                 "expect": {"error": "emptyLiteral"} },
+
+  { "id": "invalid_escape_z",          "pattern": "'\\z'",                                      "expect": {"error": "invalidEscapeSequence"} },
+  { "id": "invalid_escape_q",          "pattern": "'\\q'",                                      "expect": {"error": "invalidEscapeSequence"} },
+
+  { "id": "inverted_range",            "pattern": "'z'..'a'",                                   "expect": {"error": "invertedRange"} },
+  { "id": "invalid_range_endpoint",    "pattern": "'ab'..'z'",                                  "expect": {"error": "invalidRangeEndpoint"} },
+
+  { "id": "inverted_rep_bounds",       "pattern": "%Digit * 10..3",                             "expect": {"error": "invertedRepetitionBounds"} },
+  { "id": "fewest_on_exact_rep",       "pattern": "%Digit * 4 fewest",                          "expect": {"error": "fewestOnExactRepetition"} },
+
+  { "id": "unknown_annotation",        "pattern": "!bogus = true\n'x'",                         "expect": {"error": "unknownAnnotation"} },
+  { "id": "unknown_annotation_case",   "pattern": "!Case-Insensitive = true\n'x'",              "expect": {"error": "unknownAnnotation"} },
+  { "id": "duplicate_annotation",      "pattern": "!case-insensitive = true\n!case-insensitive = false\n'x'", "expect": {"error": "duplicateAnnotation"} },
+
+  { "id": "unknown_pos_assertion",     "pattern": "@bogus-pos",                                 "expect": {"error": "unknownPositionAssertion"} },
+  { "id": "pos_assertion_in_rep",      "pattern": "@word-start * 3",                            "expect": {"error": "positionAssertionInRepetition"} },
+
+  { "id": "empty_charset",             "pattern": "'x' excluding 'x'",                         "expect": {"error": "emptyCharacterSet"} },
+  { "id": "empty_charset_class",       "pattern": "%Digit excluding %Digit",                    "expect": {"error": "emptyCharacterSet"} },
+  { "id": "invalid_excl_operand",      "pattern": "%Digit excluding ('1' * 2)",                 "expect": {"error": "invalidExclusionOperand"} },
+  { "id": "invalid_excl_sequence",     "pattern": "'a'..'z' excluding ('a' 'b')",               "expect": {"error": "invalidExclusionOperand"} },
+  { "id": "invalid_excl_capture",      "pattern": "%Digit excluding ('1' as d)",                "expect": {"error": "invalidExclusionOperand"} },
+  { "id": "invalid_excl_literal_body", "pattern": "greeting = 'hello';\n%Alpha excluding {greeting}", "expect": {"error": "invalidExclusionOperand"} },
+
+  { "id": "subst_ignore_without_subst","pattern": "!substitutions-ignore-matching = true\n'x'", "expect": {"error": "substitutionsIgnoreMatchingWithoutSubstitutable"} },
+  { "id": "not_substitutable_body",    "pattern": "!substitutable = true\n%Digit",              "expect": {"error": "notSubstitutableBody"} }
+]

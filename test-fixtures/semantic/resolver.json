@@ -1,0 +1,19 @@
+[
+  { "id": "valid_literal",              "pattern": "'hello'",                                   "expect": "ok" },
+  { "id": "valid_capture",             "pattern": "'a' as x",                                   "expect": "ok" },
+  { "id": "valid_def_and_ref",         "pattern": "foo = 'x' ; {foo}",                          "expect": "ok" },
+  { "id": "valid_all_defs_used",       "pattern": "foo = 'a' ; bar = {foo} ; {bar}",            "expect": "ok" },
+  { "id": "valid_backref",             "pattern": "'a' as x {x}",                               "expect": "ok" },
+  { "id": "valid_dup_capture_allowed", "pattern": "'a' as x 'b' as x",                         "expect": "ok" },
+
+  { "id": "undefined_reference",       "pattern": "{foo}",                                      "expect": {"error": "undefinedReference"} },
+  { "id": "undefined_ref_in_def",      "pattern": "foo = {notDefined} ; {foo}",                 "expect": {"error": "undefinedReference"} },
+
+  { "id": "duplicate_definition",      "pattern": "foo = 'a' ; foo = 'b' ; {foo}",              "expect": {"error": "duplicateDefinition"} },
+
+  { "id": "circular_definition",       "pattern": "foo = {bar} ; bar = {foo} ; {foo}",          "expect": {"error": "circularDefinition"} },
+
+  { "id": "capture_def_conflict",      "pattern": "x = 'a' ; {x} as x",                        "expect": {"error": "captureDefinitionConflict"} },
+
+  { "id": "unused_definition",         "pattern": "foo = 'a' ; bar = 'b' ; {foo}",              "expect": {"error": "unusedDefinition"} }
+]

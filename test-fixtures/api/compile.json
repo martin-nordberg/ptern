@@ -1,6 +1,14 @@
 [
-  { "id": "lex_error_bare_at",          "pattern": "@",                        "expect": {"error":"lexError"} },
-  { "id": "parse_error_empty",          "pattern": "",                         "expect": {"error":"parseError"} },
-  { "id": "semantic_error_empty_string","pattern": "''",                       "expect": {"error":"semanticErrors"} },
-  { "id": "semantic_unknown_annotation","pattern": "!unknown = true\n'x'",     "expect": {"error":"semanticErrors"} }
+  { "id": "lex_error_bare_at",              "pattern": "@",                                    "expect": {"error":"lexError"} },
+  { "id": "lex_error_unterminated_string",  "pattern": "'unterminated",                        "expect": {"error":"lexError"} },
+  { "id": "lex_error_unexpected_char",      "pattern": "~",                                    "expect": {"error":"lexError"} },
+  { "id": "parse_error_empty",              "pattern": "",                                     "expect": {"error":"parseError"} },
+  { "id": "parse_error_unclosed_group",     "pattern": "('a'",                                 "expect": {"error":"parseError"} },
+  { "id": "parse_error_missing_semicolon",  "pattern": "d = %Digit {d}",                       "expect": {"error":"parseError"} },
+  { "id": "semantic_error_empty_string",    "pattern": "''",                                   "expect": {"error":"semanticErrors"} },
+  { "id": "semantic_unknown_annotation",    "pattern": "!unknown = true\n'x'",                 "expect": {"error":"semanticErrors"} },
+  { "id": "semantic_inverted_range",        "pattern": "'z'..'a'",                             "expect": {"error":"semanticErrors"} },
+  { "id": "semantic_undefined_reference",   "pattern": "{foo}",                                "expect": {"error":"semanticErrors"} },
+  { "id": "semantic_circular_definition",   "pattern": "a = {b} ; b = {a} ; {a}",             "expect": {"error":"semanticErrors"} },
+  { "id": "semantic_backtracking_body",     "pattern": "(%Alpha * 1..?) * 1..?",               "expect": {"error":"semanticErrors"} }
 ]

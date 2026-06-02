@@ -15,7 +15,9 @@
       { "op": "matchAllOf",    "input": "hello",           "expect": {"index":0,"length":5,"captures":{}} },
       { "op": "matchAllOf",    "input": "hello world",     "expect": null },
       { "op": "matchFirstIn",  "input": "say hello!",      "expect": {"index":4,"length":5,"captures":{}} },
-      { "op": "matchFirstIn",  "input": "world",           "expect": null }
+      { "op": "matchFirstIn",  "input": "world",           "expect": null },
+      { "op": "minLength",                                  "expect": 5 },
+      { "op": "maxLength",                                  "expect": 5 }
     ]
   },
 
@@ -33,7 +35,9 @@
       { "op": "replaceAllOf",  "input": "2024",         "replacements": {"year":"2099"}, "expect": "2099" },
       { "op": "replaceAllOf",  "input": "abc",          "replacements": {"year":"2099"}, "expect": "abc" },
       { "op": "replaceStartOf","input": "2024abc",      "replacements": {"year":"2099"}, "expect": "2099abc" },
-      { "op": "replaceEndOf",  "input": "abc2024",      "replacements": {"year":"2099"}, "expect": "abc2099" }
+      { "op": "replaceEndOf",  "input": "abc2024",      "replacements": {"year":"2099"}, "expect": "abc2099" },
+      { "op": "minLength",                               "expect": 4 },
+      { "op": "maxLength",                               "expect": 4 }
     ]
   },
 
@@ -59,7 +63,9 @@
       ]},
       { "op": "matchAllIn",  "input": "abcdef",        "expect": [] },
       { "op": "matchFirstIn","input": "abc 42 def 99", "expect": {"index":4,"length":2,"captures":{"n":"42"}} },
-      { "op": "matchNextIn", "input": "abc 42 def 99", "startIndex": 7, "expect": {"index":11,"length":2,"captures":{"n":"99"}} }
+      { "op": "matchNextIn", "input": "abc 42 def 99", "startIndex": 7, "expect": {"index":11,"length":2,"captures":{"n":"99"}} },
+      { "op": "minLength",                              "expect": 1 },
+      { "op": "maxLength",                              "expect": null }
     ]
   },
 
@@ -104,7 +110,11 @@
     "cases": [
       { "op": "matchesAllOf", "input": "2024-03-15", "expect": true },
       { "op": "matchesAllOf", "input": "2024-3-15",  "expect": false },
-      { "op": "matchAllOf",   "input": "2024-03-15", "expect": {"index":0,"length":10,"captures":{"year":"2024","month":"03","day":"15"}} }
+      { "op": "matchAllOf",   "input": "2024-03-15", "expect": {"index":0,"length":10,"captures":{"year":"2024","month":"03","day":"15"}} },
+      { "op": "matchesIn",    "input": "event on 2024-03-15 at noon", "expect": true },
+      { "op": "matchFirstIn", "input": "event on 2024-03-15 at noon", "expect": {"index":9,"length":10,"captures":{"year":"2024","month":"03","day":"15"}} },
+      { "op": "minLength",                                             "expect": 10 },
+      { "op": "maxLength",                                             "expect": 10 }
     ]
   },
 
@@ -115,7 +125,173 @@
       { "op": "matchesAllOf", "input": "1.2.3",    "expect": true },
       { "op": "matchesAllOf", "input": "10.20.300","expect": true },
       { "op": "matchesAllOf", "input": "1.2",      "expect": false },
-      { "op": "matchAllOf",   "input": "1.2.3",    "expect": {"index":0,"length":5,"captures":{"major":"1","minor":"2","patch":"3"}} }
+      { "op": "matchAllOf",   "input": "1.2.3",    "expect": {"index":0,"length":5,"captures":{"major":"1","minor":"2","patch":"3"}} },
+      { "op": "minLength",                          "expect": 5 },
+      { "op": "maxLength",                          "expect": 32 }
+    ]
+  },
+
+  {
+    "id": "word_boundary",
+    "pattern": "@word-start %Alpha * 1..? @word-end",
+    "cases": [
+      { "op": "matchesAllOf", "input": "hello",       "expect": true },
+      { "op": "matchesIn",    "input": "say hello!",  "expect": true },
+      { "op": "matchFirstIn", "input": "say hello!",  "expect": {"index":0,"length":3,"captures":{}} },
+      { "op": "matchAllIn",   "input": "one two three", "expect": [
+        {"index":0,"length":3,"captures":{}},
+        {"index":4,"length":3,"captures":{}},
+        {"index":8,"length":5,"captures":{}}
+      ]},
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": null }
+    ]
+  },
+
+  {
+    "id": "line_boundary",
+    "pattern": "!multiline = true\n@line-start %Digit * 1..? @line-end",
+    "cases": [
+      { "op": "matchesAllOf", "input": "42",          "expect": true },
+      { "op": "matchesAllOf", "input": "42abc",       "expect": false },
+      { "op": "matchAllIn",   "input": "12\nabc\n34", "expect": [
+        {"index":0,"length":2,"captures":{}},
+        {"index":7,"length":2,"captures":{}}
+      ]},
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": null }
+    ]
+  },
+
+  {
+    "id": "alternation_single_chars",
+    "pattern": "'a' | 'b' | 'c'",
+    "cases": [
+      { "op": "matchesAllOf", "input": "a",  "expect": true },
+      { "op": "matchesAllOf", "input": "b",  "expect": true },
+      { "op": "matchesAllOf", "input": "c",  "expect": true },
+      { "op": "matchesAllOf", "input": "d",  "expect": false },
+      { "op": "matchesAllOf", "input": "ab", "expect": false },
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": 1 }
+    ]
+  },
+
+  {
+    "id": "optional_group",
+    "pattern": "%Digit * 5 ('-' %Digit * 4) * 0..1",
+    "cases": [
+      { "op": "matchesAllOf", "input": "12345",     "expect": true },
+      { "op": "matchesAllOf", "input": "12345-6789","expect": true },
+      { "op": "matchesAllOf", "input": "1234",      "expect": false },
+      { "op": "minLength", "expect": 5 },
+      { "op": "maxLength", "expect": 10 }
+    ]
+  },
+
+  {
+    "id": "fewest_quantifier",
+    "pattern": "!replacements-ignore-matching = true\n'<' %Any * 1..? fewest as tag '>'",
+    "cases": [
+      { "op": "matchFirstIn", "input": "<b>bold</b>", "expect": {"index":0,"length":3,"captures":{"tag":"b"}} },
+      { "op": "matchAllIn",   "input": "<b>text</b>", "expect": [
+        {"index":0,"length":3,"captures":{"tag":"b"}},
+        {"index":7,"length":4,"captures":{"tag":"/b"}}
+      ]},
+      { "op": "replaceFirstIn","input": "<b>text</b>", "replacements": {"tag":"em"}, "expect": "<em>text</b>" }
+    ]
+  },
+
+  {
+    "id": "backreference",
+    "pattern": "%Alpha * 1..? as word '-' {word}",
+    "cases": [
+      { "op": "matchesAllOf", "input": "abc-abc",   "expect": true },
+      { "op": "matchesAllOf", "input": "abc-def",   "expect": false },
+      { "op": "matchesAllOf", "input": "x-x",       "expect": true },
+      { "op": "matchAllOf",   "input": "abc-abc",   "expect": {"index":0,"length":7,"captures":{"word":"abc"}} }
+    ]
+  },
+
+  {
+    "id": "set_difference",
+    "pattern": "%Digit excluding ('0' | '5')",
+    "cases": [
+      { "op": "matchesAllOf", "input": "1", "expect": true },
+      { "op": "matchesAllOf", "input": "4", "expect": true },
+      { "op": "matchesAllOf", "input": "9", "expect": true },
+      { "op": "matchesAllOf", "input": "0", "expect": false },
+      { "op": "matchesAllOf", "input": "5", "expect": false },
+      { "op": "matchesAllOf", "input": "a", "expect": false },
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": 1 }
+    ]
+  },
+
+  {
+    "id": "bounds_alternation",
+    "pattern": "'hi' | 'hello'",
+    "cases": [
+      { "op": "matchesAllOf", "input": "hi",    "expect": true },
+      { "op": "matchesAllOf", "input": "hello", "expect": true },
+      { "op": "matchesAllOf", "input": "hey",   "expect": false },
+      { "op": "minLength", "expect": 2 },
+      { "op": "maxLength", "expect": 5 }
+    ]
+  },
+
+  {
+    "id": "bounds_optional",
+    "pattern": "'x' %Digit * 0..1",
+    "cases": [
+      { "op": "matchesAllOf", "input": "x",  "expect": true },
+      { "op": "matchesAllOf", "input": "x5", "expect": true },
+      { "op": "matchesAllOf", "input": "5",  "expect": false },
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": 2 }
+    ]
+  },
+
+  {
+    "id": "bounds_sequence",
+    "pattern": "%Alpha * 2 %Digit * 3",
+    "cases": [
+      { "op": "matchesAllOf", "input": "ab123", "expect": true },
+      { "op": "matchesAllOf", "input": "abc123","expect": false },
+      { "op": "minLength", "expect": 5 },
+      { "op": "maxLength", "expect": 5 }
+    ]
+  },
+
+  {
+    "id": "unicode_class",
+    "pattern": "%L * 1..?",
+    "cases": [
+      { "op": "matchesAllOf", "input": "hello",  "expect": true },
+      { "op": "matchesAllOf", "input": "café",   "expect": true },
+      { "op": "matchesAllOf", "input": "123",    "expect": false },
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": null }
+    ]
+  },
+
+  {
+    "id": "matchStartOf_matchEndOf",
+    "pattern": "%Digit * 3",
+    "cases": [
+      { "op": "matchStartOf", "input": "123abc", "expect": {"index":0,"length":3,"captures":{}} },
+      { "op": "matchStartOf", "input": "abc123", "expect": null },
+      { "op": "matchEndOf",   "input": "abc123", "expect": {"index":3,"length":3,"captures":{}} },
+      { "op": "matchEndOf",   "input": "123abc", "expect": null }
+    ]
+  },
+
+  {
+    "id": "matchNextIn_advances",
+    "pattern": "'x'",
+    "cases": [
+      { "op": "matchNextIn", "input": "xyzx", "startIndex": 1, "expect": {"index":3,"length":1,"captures":{}} },
+      { "op": "matchNextIn", "input": "xyzx", "startIndex": 4, "expect": null }
     ]
   }
 ]

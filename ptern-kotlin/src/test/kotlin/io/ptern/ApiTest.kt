@@ -94,6 +94,13 @@ class ApiTest {
                 val result = ptern.substitute(captures)
                 assertEquals(node["expect"].asText(), result, label)
             }
+            "minLength" -> {
+                assertEquals(node["expect"].asInt(), ptern.minLength, label)
+            }
+            "maxLength" -> {
+                if (node["expect"].isNull) assertNull(ptern.maxLength, label)
+                else assertEquals(node["expect"].asInt(), ptern.maxLength, label)
+            }
             else -> throw IllegalArgumentException("Unknown op: $op")
         }
     }
