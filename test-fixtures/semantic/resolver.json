@@ -22,5 +22,6 @@
   { "id": "capture_inside_def_name",   "pattern": "year = %Digit * 4 as year ; {year}",        "expect": {"error": "captureDefinitionConflict"} },
   { "id": "chain_neither_reachable",   "pattern": "a = 'x' ; b = {a} ; 'y'",                  "expect": {"error": "unusedDefinition"} },
   { "id": "chain_transitively_ok",     "pattern": "a = 'x' ; b = {a} 'y' ; {b}",              "expect": "ok" },
-  { "id": "multiple_defs_ok",          "pattern": "a = 'x' ; b = 'y' ; {a} {b}",              "expect": "ok" }
+  { "id": "multiple_defs_ok",          "pattern": "a = 'x' ; b = 'y' ; {a} {b}",              "expect": "ok" },
+  { "id": "circular_three_node",       "pattern": "a = {b} ; b = {c} ; c = {a} ; {a}",        "expect": {"error": "circularDefinition"} }
 ]

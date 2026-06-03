@@ -122,7 +122,10 @@ class ApiTest {
         val replacementsNode = if (node.has("replacements")) node["replacements"] else node
         val result = mutableMapOf<String, ReplacementValue>()
         replacementsNode.fields().forEach { (k, v) ->
-            result[k] = ReplacementValue.Scalar(v.asText())
+            result[k] = if (v.isArray)
+                ReplacementValue.Array(v.elements().asSequence().map { it.asText() }.toList())
+            else
+                ReplacementValue.Scalar(v.asText())
         }
         return result
     }

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { lex } from "../src/lexer/lexer";
 import { parse } from "../src/parser/parser";
 import { compile as compileCodegen } from "../src/codegen/codegen";
-import { compile, format, PternFormatError } from "../src/index";
+import { compile, format, PternFormatError, PternCompileError, PternReplacementError, PternSubstitutionError } from "../src/index";
 import { validate } from "../src/semantic/validator";
 import { resolve } from "../src/semantic/resolver";
 import { check } from "../src/semantic/backtracking";
@@ -456,5 +456,286 @@ describe("parser/capture and structure", () => {
       "{yyyy} as year '-' {mm} as month '-' {dd} as day";
     const ast = lexAndParse(input);
     expect(ast.definitions).toHaveLength(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Replacement error detail tests (error sub-fields, not expressible in fixtures)
+// ---------------------------------------------------------------------------
+
+describe("replacement/wrongReplacementType", () => {
+  it("passing array for non-repeated capture throws wrongReplacementType", () => {
+    const p = compile("%Digit * 4 as year");
+    try {
+      p.replaceFirstIn("2026", { year: ["2027"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      expect((e as PternReplacementError).replacementError.kind).toBe("wrongReplacementType");
+    }
+  });
+});
+
+describe("replacement/arrayLengthMismatch", () => {
+  it("array too short throws arrayLengthMismatch with correct fields", () => {
+    const p = compile("!replacements-ignore-matching = true\n(%Digit * 4 as yr) * 3");
+    try {
+      p.replaceFirstIn("202420252026", { yr: ["A", "B"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      const err = (e as PternReplacementError).replacementError;
+      expect(err.kind).toBe("arrayLengthMismatch");
+      if (err.kind === "arrayLengthMismatch") {
+        expect(err.captureName).toBe("yr");
+        expect(err.provided).toBe(2);
+        expect(err.actual).toBe(3);
+      }
+    }
+  });
+
+  it("bounded rep array at min boundary accepted", () => {
+    const p = compile("!replacements-ignore-matching = true\n(%Digit * 2 as n) * 2..4");
+    expect(p.replaceFirstIn("1234", { n: ["X", "Y"] })).toBe("XY");
+  });
+
+  it("bounded rep array too short throws with correct actual", () => {
+    const p = compile("!replacements-ignore-matching = true\n(%Digit * 2 as n) * 2..4");
+    try {
+      p.replaceFirstIn("1234", { n: ["X"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      const err = (e as PternReplacementError).replacementError;
+      expect(err.kind).toBe("arrayLengthMismatch");
+      if (err.kind === "arrayLengthMismatch") {
+        expect(err.captureName).toBe("n");
+        expect(err.provided).toBe(1);
+        expect(err.actual).toBe(2);
+      }
+    }
+  });
+});
+
+describe("replacement/duplicateRepetitionCapture", () => {
+  it("same capture name in two repetitions throws duplicateRepetitionCapture", () => {
+    const p = compile("!replacements-ignore-matching = true\n(%Digit as n) * 2 (%Alpha as n) * 3");
+    try {
+      p.replaceFirstIn("12abc", { n: ["x", "y"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      expect((e as PternReplacementError).replacementError.kind).toBe("duplicateRepetitionCapture");
+    }
+  });
+});
+
+describe("replacement/invalidReplacementValue", () => {
+  it("invalid scalar throws invalidReplacementValue", () => {
+    const p = compile("%Digit * 4 as year");
+    try {
+      p.replaceFirstIn("event 2026", { year: "202" });
+      throw new Error("expected throw");
+    } catch (e) {
+      expect((e as PternReplacementError).replacementError.kind).toBe("invalidReplacementValue");
+    }
+  });
+
+  it("invalid array element throws invalidReplacementValue", () => {
+    const p = compile("(%Digit * 2 as n) * 3");
+    try {
+      p.replaceFirstIn("121314", { n: ["12", "ab", "34"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      expect((e as PternReplacementError).replacementError.kind).toBe("invalidReplacementValue");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Substitution error detail tests (not expressible in fixtures)
+// ---------------------------------------------------------------------------
+
+describe("substitution/notSubstitutable", () => {
+  it("calling substitute on non-substitutable pattern throws notSubstitutable", () => {
+    const p = compile("%Digit * 4 as year");
+    try {
+      p.substitute({ year: "2026" });
+      throw new Error("expected throw");
+    } catch (e) {
+      expect((e as PternSubstitutionError).substitutionError.kind).toBe("notSubstitutable");
+    }
+  });
+});
+
+describe("substitution/missingCapture", () => {
+  it("throws missingCapture with correct name", () => {
+    const p = compile("!substitutable = true\n%Digit * 4 as year");
+    try {
+      p.substitute({});
+      throw new Error("expected throw");
+    } catch (e) {
+      const err = (e as PternSubstitutionError).substitutionError;
+      expect(err.kind).toBe("missingCapture");
+      if (err.kind === "missingCapture") expect(err.name).toBe("year");
+    }
+  });
+});
+
+describe("substitution/captureMismatch", () => {
+  it("throws captureMismatch with name and value", () => {
+    const p = compile("!substitutable = true\n%Digit * 4 as year");
+    try {
+      p.substitute({ year: "abcd" });
+      throw new Error("expected throw");
+    } catch (e) {
+      const err = (e as PternSubstitutionError).substitutionError;
+      expect(err.kind).toBe("captureMismatch");
+      if (err.kind === "captureMismatch") {
+        expect(err.name).toBe("year");
+        expect(err.value).toBe("abcd");
+      }
+    }
+  });
+
+  it("bad array element throws captureMismatch with failing value", () => {
+    const p = compile("!substitutable = true\n(%Digit as d) * 3");
+    try {
+      p.substitute({ d: ["1", "x", "3"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      const err = (e as PternSubstitutionError).substitutionError;
+      expect(err.kind).toBe("captureMismatch");
+      if (err.kind === "captureMismatch") expect(err.value).toBe("x");
+    }
+  });
+});
+
+describe("substitution/arrayLengthError", () => {
+  it("throws arrayLengthError when array below min", () => {
+    const p = compile("!substitutable = true\n(%Digit as d) * 3..5");
+    try {
+      p.substitute({ d: ["1", "2"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      const err = (e as PternSubstitutionError).substitutionError;
+      expect(err.kind).toBe("arrayLengthError");
+      if (err.kind === "arrayLengthError") {
+        expect(err.name).toBe("d");
+        expect(err.length).toBe(2);
+        expect(err.min).toBe(3);
+        expect(err.max).toBe(5);
+      }
+    }
+  });
+
+  it("throws arrayLengthError when array above max", () => {
+    const p = compile("!substitutable = true\n(%Digit as d) * 1..3");
+    try {
+      p.substitute({ d: ["1", "2", "3", "4", "5"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      const err = (e as PternSubstitutionError).substitutionError;
+      expect(err.kind).toBe("arrayLengthError");
+      if (err.kind === "arrayLengthError") {
+        expect(err.name).toBe("d");
+        expect(err.length).toBe(5);
+        expect(err.min).toBe(1);
+        expect(err.max).toBe(3);
+      }
+    }
+  });
+
+  it("unbounded: throws when below min, max is null", () => {
+    const p = compile("!substitutable = true\n(%Digit as d) * 3..?");
+    try {
+      p.substitute({ d: ["1", "2"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      const err = (e as PternSubstitutionError).substitutionError;
+      expect(err.kind).toBe("arrayLengthError");
+      if (err.kind === "arrayLengthError") {
+        expect(err.name).toBe("d");
+        expect(err.length).toBe(2);
+        expect(err.min).toBe(3);
+        expect(err.max).toBeNull();
+      }
+    }
+  });
+});
+
+describe("substitution/noMatchingBranch", () => {
+  it("throws noMatchingBranch when no captures match any branch", () => {
+    const p = compile("!substitutable = true\n%Digit * 4 as year | %Alpha * 1..? as word");
+    try {
+      p.substitute({});
+      throw new Error("expected throw");
+    } catch (e) {
+      expect((e as PternSubstitutionError).substitutionError.kind).toBe("noMatchingBranch");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Capture misc (not expressible in fixture format)
+// ---------------------------------------------------------------------------
+
+describe("capture/__rep_N filtered from results", () => {
+  it("synthetic rep group names are absent from captures", () => {
+    const p = compile("(%Digit as d) * 3");
+    const m = p.matchFirstIn("123");
+    expect(m).not.toBeNull();
+    const keys = Object.keys(m!.captures);
+    expect(keys.every(k => !k.startsWith("__rep_"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Array replacement (TypeScript-only: per-iteration semantics differ in Kotlin)
+// ---------------------------------------------------------------------------
+
+describe("array replacement/fixed repetition", () => {
+  it("array elements replace corresponding iterations", () => {
+    const p = compile("!replacements-ignore-matching = true\n(%Digit * 4 as yr) * 3");
+    expect(p.replaceFirstIn("202420252026", { yr: ["A", "B", "C"] })).toBe("ABC");
+  });
+});
+
+describe("array replacement/bounded repetition", () => {
+  it("array elements replace actual iterations (not max)", () => {
+    const p = compile("!replacements-ignore-matching = true\n(%Digit * 4 as yr ' ') * 1..3");
+    expect(p.replaceFirstIn("2024 2025 ", { yr: ["X", "Y"] })).toBe("X Y ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Array substitution (TypeScript-only: per-iteration semantics differ in Kotlin)
+// ---------------------------------------------------------------------------
+
+describe("substitute/array per iteration", () => {
+  it("fixed rep: array elements consumed per iteration", () => {
+    const p = compile("!substitutable = true\n(%Digit as d) * 3");
+    expect(p.substitute({ d: ["1", "2", "3"] })).toBe("123");
+  });
+
+  it("bounded rep CSV: array col values joined with delimiter", () => {
+    const p = compile("!substitutable = true\nfield = %Any excluding ',' * 1..20;\n{field} as col (',' {field} as col) * 0..5");
+    expect(p.substitute({ col: ["alice", "bob", "carol"] })).toBe("alice,bob,carol");
+  });
+
+  it("empty array gives zero iterations for optional repetition", () => {
+    const p = compile("!substitutable = true\n'[' (%Digit as d ',' ) * 0..5 ']'");
+    expect(p.substitute({ d: [] })).toBe("[]");
+  });
+
+  it("array elements consumed in order with interleaved literals", () => {
+    const p = compile("!substitutable = true\n(%Alpha * 1..? as w ' ') * 1..4");
+    expect(p.substitute({ w: ["one", "two", "three"] })).toBe("one two three ");
+  });
+
+  it("unbounded rep: array exhausted then stops", () => {
+    const p = compile("!substitutable = true\n(%Alpha * 1..? as w ' ') * 1..?");
+    expect(p.substitute({ w: ["a", "bb", "ccc"] })).toBe("a bb ccc ");
+  });
+
+  it("empty array element with ignore-matching omits that iteration", () => {
+    const p = compile("!substitutable = true\n!substitutions-ignore-matching = true\n(%Digit as d) * 3");
+    expect(p.substitute({ d: ["1", "", "3"] })).toBe("13");
   });
 });

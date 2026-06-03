@@ -95,5 +95,10 @@
   { "id": "valid_fewest_unbounded",     "pattern": "%Any * 1..? fewest",                         "expect": "ok" },
   { "id": "valid_fewest_zero_unbounded","pattern": "%Any * 0..? fewest",                         "expect": "ok" },
   { "id": "valid_fewest_bounded",       "pattern": "%Any * 3..10 fewest",                        "expect": "ok" },
-  { "id": "valid_fewest_optional",      "pattern": "%Any * 0..1 fewest",                         "expect": "ok" }
+  { "id": "valid_fewest_optional",      "pattern": "%Any * 0..1 fewest",                         "expect": "ok" },
+
+  { "id": "invalid_escape_x",          "pattern": "'\\x41'",                                    "expect": {"error": "invalidEscapeSequence"} },
+  { "id": "inverted_bounds_100_1",      "pattern": "'a' * 100..1",                              "expect": {"error": "invertedRepetitionBounds"} },
+  { "id": "invalid_range_endpoint_right","pattern": "'a'..'yz'",                                "expect": {"error": "invalidRangeEndpoint"} },
+  { "id": "inverted_range_9_0",         "pattern": "'9'..'0'",                                  "expect": {"error": "invertedRange"} }
 ]

@@ -301,5 +301,600 @@
       { "op": "minLength", "expect": 2 },
       { "op": "maxLength", "expect": 5 }
     ]
+  },
+
+  {
+    "id": "bounds_digit_class",
+    "pattern": "%Digit",
+    "cases": [
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": 1 }
+    ]
+  },
+
+  {
+    "id": "bounds_optional_digit",
+    "pattern": "%Digit * 0..1",
+    "cases": [
+      { "op": "minLength", "expect": 0 },
+      { "op": "maxLength", "expect": 1 }
+    ]
+  },
+
+  {
+    "id": "bounds_seq_literal_class",
+    "pattern": "'ab' %Digit",
+    "cases": [
+      { "op": "minLength", "expect": 3 },
+      { "op": "maxLength", "expect": 3 }
+    ]
+  },
+
+  {
+    "id": "bounds_alt_asymmetric",
+    "pattern": "'a' | 'bcd'",
+    "cases": [
+      { "op": "matchesAllOf", "input": "a",   "expect": true },
+      { "op": "matchesAllOf", "input": "bcd", "expect": true },
+      { "op": "matchesAllOf", "input": "ab",  "expect": false },
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": 3 }
+    ]
+  },
+
+  {
+    "id": "bounds_alt_unbounded",
+    "pattern": "'a' | %Digit * 1..?",
+    "cases": [
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": null }
+    ]
+  },
+
+  {
+    "id": "bounds_interp_def",
+    "pattern": "d = %Digit * 4; {d}",
+    "cases": [
+      { "op": "matchesAllOf", "input": "2024", "expect": true },
+      { "op": "minLength", "expect": 4 },
+      { "op": "maxLength", "expect": 4 }
+    ]
+  },
+
+  {
+    "id": "bounds_pos_assertion",
+    "pattern": "@word-start %Digit * 4 @word-end",
+    "cases": [
+      { "op": "minLength", "expect": 4 },
+      { "op": "maxLength", "expect": 4 }
+    ]
+  },
+
+  {
+    "id": "bounds_multiline",
+    "pattern": "!multiline = true\n%Alpha * 1..?",
+    "cases": [
+      { "op": "minLength", "expect": 1 },
+      { "op": "maxLength", "expect": null }
+    ]
+  },
+
+  {
+    "id": "rep_capture_last_iteration",
+    "pattern": "(%Digit * 4 as yr) * 3",
+    "cases": [
+      { "op": "matchFirstIn", "input": "202420252026", "expect": {"index":0,"length":12,"captures":{"yr":"2026"}} },
+      { "op": "matchAllOf",   "input": "202420252026", "expect": {"index":0,"length":12,"captures":{"yr":"2026"}} }
+    ]
+  },
+
+  {
+    "id": "optional_capture_absent",
+    "pattern": "('a' as opt) * 0..1",
+    "cases": [
+      { "op": "matchFirstIn", "input": "b", "expect": {"index":0,"length":0,"captures":{}} },
+      { "op": "matchesAllOf", "input": "a", "expect": true }
+    ]
+  },
+
+  {
+    "id": "alt_branch_captures",
+    "pattern": "'a' as x | 'b' as y",
+    "cases": [
+      { "op": "matchFirstIn", "input": "a", "expect": {"index":0,"length":1,"captures":{"x":"a"}} },
+      { "op": "matchFirstIn", "input": "b", "expect": {"index":0,"length":1,"captures":{"y":"b"}} }
+    ]
+  },
+
+  {
+    "id": "dup_capture_first_wins",
+    "pattern": "'a' as x '-' 'b' as x",
+    "cases": [
+      { "op": "matchesAllOf", "input": "a-b", "expect": true },
+      { "op": "matchFirstIn", "input": "a-b", "expect": {"index":0,"length":3,"captures":{"x":"a"}} }
+    ]
+  },
+
+  {
+    "id": "case_insensitive_backref",
+    "pattern": "!case-insensitive = true\n%Alpha * 1..? as word ' ' {word}",
+    "cases": [
+      { "op": "matchesAllOf", "input": "Hello hello", "expect": true },
+      { "op": "matchesAllOf", "input": "Hello HELLO", "expect": true },
+      { "op": "matchesAllOf", "input": "Hello world", "expect": false }
+    ]
+  },
+
+  {
+    "id": "multiple_captures_replace",
+    "pattern": "%Alpha * 1..? as first '-' %Alpha * 1..? as last",
+    "cases": [
+      { "op": "replaceAllOf", "input": "foo-bar", "replacements": {"first":"baz","last":"qux"}, "expect": "baz-qux" }
+    ]
+  },
+
+  {
+    "id": "scalar_replace_fixed_rep",
+    "pattern": "!replacements-ignore-matching = true\n(%Digit * 4 as yr) * 3",
+    "cases": [
+      { "op": "replaceFirstIn", "input": "202420252026", "replacements": {"yr":"YYYY"}, "expect": "YYYYYYYYYYYY" }
+    ]
+  },
+
+  {
+    "id": "scalar_replace_bounded_rep",
+    "pattern": "!replacements-ignore-matching = true\n(%Digit * 4 as yr ' ') * 1..3",
+    "cases": [
+      { "op": "replaceFirstIn", "input": "2024 2025 2026 ", "replacements": {"yr":"YYYY"}, "expect": "YYYY YYYY YYYY " }
+    ]
+  },
+
+  {
+    "id": "dup_capture_replace_first_only",
+    "pattern": "!replacements-ignore-matching = true\n'foo' as x '-' 'bar' as x",
+    "cases": [
+      { "op": "replaceFirstIn", "input": "foo-bar", "replacements": {"x":"Z"}, "expect": "Z-bar" }
+    ]
+  },
+
+  {
+    "id": "backref_span_replace",
+    "pattern": "!replacements-ignore-matching = true\n%Alpha * 3 as tag ',' {tag}",
+    "cases": [
+      { "op": "replaceFirstIn", "input": "abc,abc", "replacements": {"tag":"xyz"}, "expect": "xyz,abc" }
+    ]
+  },
+
+  {
+    "id": "replace_empty_string",
+    "pattern": "!replacements-ignore-matching = true\n%Digit * 4 as year",
+    "cases": [
+      { "op": "replaceFirstIn", "input": "event 2026", "replacements": {"year":""}, "expect": "event " },
+      { "op": "replaceAllIn",   "input": "2026 and 2025", "replacements": {"year":""}, "expect": " and " }
+    ]
+  },
+
+  {
+    "id": "replace_two_captures_all_in",
+    "pattern": "!replacements-ignore-matching = true\n%Digit * 4 as year '-' %Digit * 2 as month",
+    "cases": [
+      { "op": "replaceAllIn",   "input": "2026-07 and 2025-03", "replacements": {"year":"YYYY","month":"MM"}, "expect": "YYYY-MM and YYYY-MM" }
+    ]
+  },
+
+  {
+    "id": "substitute_literal",
+    "pattern": "!substitutable = true\n'hello'",
+    "cases": [
+      { "op": "substitute", "captures": {}, "expect": "hello" }
+    ]
+  },
+
+  {
+    "id": "substitute_alternation",
+    "pattern": "!substitutable = true\n%Digit * 4 as year | %Alpha * 1..? as word",
+    "cases": [
+      { "op": "substitute", "captures": {"year":"2026"}, "expect": "2026" },
+      { "op": "substitute", "captures": {"word":"hello"}, "expect": "hello" }
+    ]
+  },
+
+  {
+    "id": "substitute_fixed_rep_scalar",
+    "pattern": "!substitutable = true\n(%Digit as d) * 3",
+    "cases": [
+      { "op": "substitute", "captures": {"d":"7"}, "expect": "777" }
+    ]
+  },
+
+  {
+    "id": "substitute_dup_capture",
+    "pattern": "!substitutable = true\nword = %Alpha * 1..20;\n'<' {word} as tag '>' {word} as body '</' {word} as tag '>'",
+    "cases": [
+      { "op": "substitute", "captures": {"tag":"em","body":"hello"}, "expect": "<em>hello</em>" }
+    ]
+  },
+
+
+  {
+    "id": "substitute_literal_fallback",
+    "pattern": "!substitutable = true\n%Digit * 4 as year | 'unknown'",
+    "cases": [
+      { "op": "substitute", "captures": {}, "expect": "unknown" }
+    ]
+  },
+
+  {
+    "id": "substitute_ignore_empty_scalar",
+    "pattern": "!substitutable = true\n!substitutions-ignore-matching = true\n'[' %Digit as d ']'",
+    "cases": [
+      { "op": "substitute", "captures": {"d":""}, "expect": "[]" }
+    ]
+  },
+
+
+  {
+    "id": "substitute_three_branch",
+    "pattern": "!substitutable = true\n%Digit * 4 as year | %Alpha * 1..? as word | 'fallback'",
+    "cases": [
+      { "op": "substitute", "captures": {"word":"hello"}, "expect": "hello" },
+      { "op": "substitute", "captures": {}, "expect": "fallback" }
+    ]
+  },
+
+  {
+    "id": "sub_pattern_reuse",
+    "pattern": "d = %Digit * 4; {d} '-' {d}",
+    "cases": [
+      { "op": "matchesAllOf", "input": "2024-2026", "expect": true },
+      { "op": "matchesAllOf", "input": "2024-202",  "expect": false }
+    ]
+  },
+
+  {
+    "id": "sub_pattern_in_rep",
+    "pattern": "seg = %Digit * 2; {seg} * 3",
+    "cases": [
+      { "op": "matchesAllOf", "input": "123456", "expect": true },
+      { "op": "matchesAllOf", "input": "12345",  "expect": false }
+    ]
+  },
+
+  {
+    "id": "backreference_after_interp",
+    "pattern": "num = %Digit * 1..3; {num} as tag ':' {tag}",
+    "cases": [
+      { "op": "matchesAllOf", "input": "42:42",  "expect": true },
+      { "op": "matchesAllOf", "input": "42:43",  "expect": false },
+      { "op": "matchFirstIn", "input": "99:99 x", "expect": {"index":0,"length":5,"captures":{"tag":"99"}} }
+    ]
+  },
+
+  {
+    "id": "us_date",
+    "pattern": "mm = '0' '1'..'9' | '1' '0'..'2';\ndd = '0' '1'..'9' | '1'..'2' %Digit | '3' '0'..'1';\n{mm} '/' {dd} '/' %Digit * 4",
+    "cases": [
+      { "op": "matchesAllOf", "input": "07/04/2026", "expect": true },
+      { "op": "matchesAllOf", "input": "01/01/2000", "expect": true },
+      { "op": "matchesAllOf", "input": "12/31/1999", "expect": true },
+      { "op": "matchesAllOf", "input": "7/4/2026",   "expect": false },
+      { "op": "matchesAllOf", "input": "13/04/2026", "expect": false },
+      { "op": "matchesAllOf", "input": "07-04-2026", "expect": false }
+    ]
+  },
+
+  {
+    "id": "time_24",
+    "pattern": "hr = '0'..'1' %Digit | '2' '0'..'3';\nms = '0'..'5' %Digit;\n{hr} ':' {ms} (':' {ms}) * 0..1",
+    "cases": [
+      { "op": "matchesAllOf", "input": "00:00",    "expect": true },
+      { "op": "matchesAllOf", "input": "23:59",    "expect": true },
+      { "op": "matchesAllOf", "input": "12:30",    "expect": true },
+      { "op": "matchesAllOf", "input": "09:05:00", "expect": true },
+      { "op": "matchesAllOf", "input": "23:59:59", "expect": true },
+      { "op": "matchesAllOf", "input": "24:00",    "expect": false },
+      { "op": "matchesAllOf", "input": "12:60",    "expect": false },
+      { "op": "matchesAllOf", "input": "9:00",     "expect": false },
+      { "op": "matchesAllOf", "input": "12:30:60", "expect": false },
+      { "op": "minLength", "expect": 5 },
+      { "op": "maxLength", "expect": 8 }
+    ]
+  },
+
+  {
+    "id": "hex_literal",
+    "pattern": "!case-insensitive = true\n'0x' %Xdigit * 1..16 as value",
+    "cases": [
+      { "op": "matchesAllOf", "input": "0x0",         "expect": true },
+      { "op": "matchesAllOf", "input": "0xFF",         "expect": true },
+      { "op": "matchesAllOf", "input": "0xDEADBEEF",  "expect": true },
+      { "op": "matchesAllOf", "input": "0XFF",         "expect": true },
+      { "op": "matchesAllOf", "input": "0x",           "expect": false },
+      { "op": "matchesAllOf", "input": "FF",           "expect": false },
+      { "op": "matchAllOf",   "input": "0xDEAD", "expect": {"index":0,"length":6,"captures":{"value":"DEAD"}} },
+      { "op": "minLength", "expect": 3 },
+      { "op": "maxLength", "expect": 18 }
+    ]
+  },
+
+  {
+    "id": "octal_literal",
+    "pattern": "'0' '0'..'7' * 1..?",
+    "cases": [
+      { "op": "matchesAllOf", "input": "00",       "expect": true },
+      { "op": "matchesAllOf", "input": "0755",     "expect": true },
+      { "op": "matchesAllOf", "input": "01234567", "expect": true },
+      { "op": "matchesAllOf", "input": "0",  "expect": false },
+      { "op": "matchesAllOf", "input": "08", "expect": false },
+      { "op": "matchesAllOf", "input": "755","expect": false }
+    ]
+  },
+
+  {
+    "id": "binary_literal",
+    "pattern": "'0b' ('0' | '1') * 1..?",
+    "cases": [
+      { "op": "matchesAllOf", "input": "0b0",    "expect": true },
+      { "op": "matchesAllOf", "input": "0b1010", "expect": true },
+      { "op": "matchesAllOf", "input": "0b",     "expect": false },
+      { "op": "matchesAllOf", "input": "0b2",    "expect": false },
+      { "op": "matchesAllOf", "input": "1010",   "expect": false }
+    ]
+  },
+
+  {
+    "id": "boolean_keyword",
+    "pattern": "'true' | 'false'",
+    "cases": [
+      { "op": "matchesAllOf", "input": "true",  "expect": true },
+      { "op": "matchesAllOf", "input": "false", "expect": true },
+      { "op": "matchesAllOf", "input": "True",  "expect": false },
+      { "op": "matchesAllOf", "input": "yes",   "expect": false },
+      { "op": "minLength", "expect": 4 },
+      { "op": "maxLength", "expect": 5 }
+    ]
+  },
+
+  {
+    "id": "null_keyword",
+    "pattern": "'null' | 'undefined' | 'nil' | 'None'",
+    "cases": [
+      { "op": "matchesAllOf", "input": "null",      "expect": true },
+      { "op": "matchesAllOf", "input": "undefined", "expect": true },
+      { "op": "matchesAllOf", "input": "nil",       "expect": true },
+      { "op": "matchesAllOf", "input": "None",      "expect": true },
+      { "op": "matchesAllOf", "input": "Null",      "expect": false },
+      { "op": "matchesAllOf", "input": "NULL",      "expect": false }
+    ]
+  },
+
+  {
+    "id": "email_address",
+    "pattern": "lc = %Alnum | '.' | '_' | '%' | '+' | '-';\ndc = %Alnum | '.' | '-';\n{lc} * 1..? '@' {dc} * 1..? '.' %Alpha * 2..?",
+    "cases": [
+      { "op": "matchesAllOf", "input": "user@example.com",             "expect": true },
+      { "op": "matchesAllOf", "input": "first.last@sub.domain.org",    "expect": true },
+      { "op": "matchesAllOf", "input": "user+tag@example.co.uk",       "expect": true },
+      { "op": "matchesAllOf", "input": "notanemail",    "expect": false },
+      { "op": "matchesAllOf", "input": "@example.com", "expect": false },
+      { "op": "matchesAllOf", "input": "user@",         "expect": false }
+    ]
+  },
+
+  {
+    "id": "ipv4_simple",
+    "pattern": "oct = %Digit * 1..3;\n({oct} '.') * 3 {oct}",
+    "cases": [
+      { "op": "matchesAllOf", "input": "192.168.1.1",     "expect": true },
+      { "op": "matchesAllOf", "input": "0.0.0.0",         "expect": true },
+      { "op": "matchesAllOf", "input": "255.255.255.255", "expect": true },
+      { "op": "matchesAllOf", "input": "192.168.1",       "expect": false },
+      { "op": "matchesAllOf", "input": "192.168.1.1.1",   "expect": false },
+      { "op": "matchesAllOf", "input": "1.2.3.4444",      "expect": false }
+    ]
+  },
+
+  {
+    "id": "ipv4_strict",
+    "pattern": "octet = %Digit | '1'..'9' %Digit | '1' %Digit %Digit | '2' '0'..'4' %Digit | '2' '5' '0'..'5';\n{octet} as a '.' {octet} as b '.' {octet} as c '.' {octet} as d",
+    "cases": [
+      { "op": "matchesAllOf", "input": "0.0.0.0",           "expect": true },
+      { "op": "matchesAllOf", "input": "255.255.255.255",   "expect": true },
+      { "op": "matchesAllOf", "input": "192.168.0.1",       "expect": true },
+      { "op": "matchesAllOf", "input": "256.0.0.1",         "expect": false },
+      { "op": "matchesAllOf", "input": "192.168.0.300",     "expect": false },
+      { "op": "matchAllOf",   "input": "192.168.0.1",       "expect": {"index":0,"length":11,"captures":{"a":"192","b":"168","c":"0","d":"1"}} }
+    ]
+  },
+
+  {
+    "id": "us_zip",
+    "pattern": "%Digit * 5 ('-' %Digit * 4) * 0..1",
+    "cases": [
+      { "op": "matchesAllOf", "input": "90210",      "expect": true },
+      { "op": "matchesAllOf", "input": "90210-1234", "expect": true },
+      { "op": "matchesAllOf", "input": "9021",       "expect": false },
+      { "op": "matchesAllOf", "input": "90210-123",  "expect": false },
+      { "op": "minLength", "expect": 5 },
+      { "op": "maxLength", "expect": 10 }
+    ]
+  },
+
+  {
+    "id": "uuid",
+    "pattern": "%Xdigit * 8 '-' (%Xdigit * 4 '-') * 3 %Xdigit * 12",
+    "cases": [
+      { "op": "matchesAllOf", "input": "550e8400-e29b-41d4-a716-446655440000", "expect": true },
+      { "op": "matchesAllOf", "input": "00000000-0000-0000-0000-000000000000", "expect": true },
+      { "op": "matchesAllOf", "input": "550e8400-e29b-41d4-a716-44665544000",  "expect": false },
+      { "op": "matchesAllOf", "input": "gggggggg-gggg-gggg-gggg-gggggggggggg","expect": false },
+      { "op": "minLength", "expect": 36 },
+      { "op": "maxLength", "expect": 36 }
+    ]
+  },
+
+  {
+    "id": "us_ssn",
+    "pattern": "%Digit * 3 '-' %Digit * 2 '-' %Digit * 4",
+    "cases": [
+      { "op": "matchesAllOf", "input": "123-45-6789", "expect": true },
+      { "op": "matchesAllOf", "input": "000-00-0000", "expect": true },
+      { "op": "matchesAllOf", "input": "123456789",   "expect": false },
+      { "op": "matchesAllOf", "input": "12-345-6789", "expect": false },
+      { "op": "minLength", "expect": 11 },
+      { "op": "maxLength", "expect": 11 }
+    ]
+  },
+
+  {
+    "id": "visa_card",
+    "pattern": "'4' %Digit * 12 (%Digit * 3) * 0..1",
+    "cases": [
+      { "op": "matchesAllOf", "input": "4111111111111",    "expect": true },
+      { "op": "matchesAllOf", "input": "4111111111111111", "expect": true },
+      { "op": "matchesAllOf", "input": "5111111111111",    "expect": false },
+      { "op": "matchesAllOf", "input": "411111111111",     "expect": false }
+    ]
+  },
+
+  {
+    "id": "cc_four_groups",
+    "pattern": "group = %Digit * 4;\n{group} ' ' {group} ' ' {group} ' ' {group}",
+    "cases": [
+      { "op": "matchesAllOf", "input": "4111 1111 1111 1111", "expect": true },
+      { "op": "matchesAllOf", "input": "4111111111111111",    "expect": false },
+      { "op": "matchesAllOf", "input": "4111 1111 1111 111",  "expect": false },
+      { "op": "minLength", "expect": 19 },
+      { "op": "maxLength", "expect": 19 }
+    ]
+  },
+
+  {
+    "id": "sha1_hash",
+    "pattern": "%Xdigit * 40",
+    "cases": [
+      { "op": "matchesAllOf", "input": "da39a3ee5e6b4b0d3255bfef95601890afd80709", "expect": true },
+      { "op": "matchesAllOf", "input": "da39a3ee5e6b4b0d3255bfef95601890afd8070",  "expect": false },
+      { "op": "matchesAllOf", "input": "da39a3ee5e6b4b0d3255bfef95601890afd807090","expect": false },
+      { "op": "minLength", "expect": 40 },
+      { "op": "maxLength", "expect": 40 }
+    ]
+  },
+
+  {
+    "id": "sha256_hash",
+    "pattern": "%Xdigit * 64",
+    "cases": [
+      { "op": "matchesAllOf", "input": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "expect": true },
+      { "op": "matchesAllOf", "input": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85",  "expect": false },
+      { "op": "minLength", "expect": 64 },
+      { "op": "maxLength", "expect": 64 }
+    ]
+  },
+
+  {
+    "id": "css_hex_color",
+    "pattern": "'#' (%Xdigit * 6 | %Xdigit * 3)",
+    "cases": [
+      { "op": "matchesAllOf", "input": "#ff0000", "expect": true },
+      { "op": "matchesAllOf", "input": "#FFFFFF", "expect": true },
+      { "op": "matchesAllOf", "input": "#f00",    "expect": true },
+      { "op": "matchesAllOf", "input": "#abc",    "expect": true },
+      { "op": "matchesAllOf", "input": "ff0000",  "expect": false },
+      { "op": "matchesAllOf", "input": "#ff000",  "expect": false },
+      { "op": "matchesAllOf", "input": "#gg0000", "expect": false },
+      { "op": "minLength", "expect": 4 },
+      { "op": "maxLength", "expect": 7 }
+    ]
+  },
+
+  {
+    "id": "blank_line",
+    "pattern": "%Space * 0..?",
+    "cases": [
+      { "op": "matchesAllOf", "input": "",    "expect": true },
+      { "op": "matchesAllOf", "input": " ",   "expect": true },
+      { "op": "matchesAllOf", "input": "   ", "expect": true },
+      { "op": "matchesAllOf", "input": "a",   "expect": false },
+      { "op": "matchesAllOf", "input": " x ", "expect": false },
+      { "op": "minLength", "expect": 0 },
+      { "op": "maxLength", "expect": null }
+    ]
+  },
+
+  {
+    "id": "ascii_identifier",
+    "pattern": "%Alpha (%Alnum | '_') * 0..?",
+    "cases": [
+      { "op": "matchesAllOf", "input": "x",          "expect": true },
+      { "op": "matchesAllOf", "input": "foo_bar",    "expect": true },
+      { "op": "matchesAllOf", "input": "CamelCase",  "expect": true },
+      { "op": "matchesAllOf", "input": "1abc",       "expect": false },
+      { "op": "matchesAllOf", "input": "_foo",       "expect": false },
+      { "op": "matchesAllOf", "input": "foo-bar",    "expect": false }
+    ]
+  },
+
+  {
+    "id": "snake_case",
+    "pattern": "%Lower * 1..? ('_' %Lower * 1..?) * 0..?",
+    "cases": [
+      { "op": "matchesAllOf", "input": "foo",          "expect": true },
+      { "op": "matchesAllOf", "input": "foo_bar",      "expect": true },
+      { "op": "matchesAllOf", "input": "my_var_name",  "expect": true },
+      { "op": "matchesAllOf", "input": "FooBar",       "expect": false },
+      { "op": "matchesAllOf", "input": "_foo",         "expect": false },
+      { "op": "matchesAllOf", "input": "foo_",         "expect": false },
+      { "op": "matchesAllOf", "input": "foo__bar",     "expect": false }
+    ]
+  },
+
+  {
+    "id": "decimal_2dp",
+    "pattern": "%Digit * 1..? ('.' %Digit * 1..2) * 0..1",
+    "cases": [
+      { "op": "matchesAllOf", "input": "0",    "expect": true },
+      { "op": "matchesAllOf", "input": "42",   "expect": true },
+      { "op": "matchesAllOf", "input": "3.1",  "expect": true },
+      { "op": "matchesAllOf", "input": "9.99", "expect": true },
+      { "op": "matchesAllOf", "input": "3.141","expect": false },
+      { "op": "matchesAllOf", "input": ".5",   "expect": false },
+      { "op": "matchesAllOf", "input": "1.",   "expect": false }
+    ]
+  },
+
+  {
+    "id": "c_line_comment",
+    "pattern": "'//' (%Any excluding '\\n') * 0..?",
+    "cases": [
+      { "op": "matchesAllOf",  "input": "// comment",          "expect": true },
+      { "op": "matchesAllOf",  "input": "//",                  "expect": true },
+      { "op": "matchesAllOf",  "input": "/ comment",           "expect": false },
+      { "op": "matchesAllOf",  "input": "// line one\n// line two", "expect": false },
+      { "op": "matchesStartOf","input": "// line one\n// line two", "expect": true }
+    ]
+  },
+
+  {
+    "id": "c_block_comment",
+    "pattern": "'/*' %Any * 0..? '*/'",
+    "cases": [
+      { "op": "matchesAllOf", "input": "/* comment */",     "expect": true },
+      { "op": "matchesAllOf", "input": "/**/",              "expect": true },
+      { "op": "matchesAllOf", "input": "/* multi\nline */", "expect": true },
+      { "op": "matchesAllOf", "input": "/* unterminated",   "expect": false }
+    ]
+  },
+
+  {
+    "id": "html_comment",
+    "pattern": "'<!--' %Any * 0..? '-->'",
+    "cases": [
+      { "op": "matchesAllOf", "input": "<!-- comment -->",      "expect": true },
+      { "op": "matchesAllOf", "input": "<!---->",               "expect": true },
+      { "op": "matchesAllOf", "input": "<!-- multi\nline -->",  "expect": true },
+      { "op": "matchesAllOf", "input": "<!-- unterminated",     "expect": false },
+      { "op": "matchesAllOf", "input": "<! comment -->",        "expect": false }
+    ]
   }
 ]
