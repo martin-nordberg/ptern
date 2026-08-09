@@ -1,5 +1,7 @@
 # Ptern User Guide — TypeScript API
 
+> **See also:** [Gleam User Guide](../../ptern-gleam/doc/user-guide.md) for the Gleam edition, or [Kotlin User Guide](../../ptern-kotlin/doc/user-guide.md) for the JVM/Kotlin edition.
+
 Ptern is a pattern language that compiles to regular expressions. It is designed to be readable first — every construct is either a plain keyword or punctuation that carries an obvious meaning. You should be able to read a ptern aloud and have it make sense.
 
 This guide builds up the language from scratch, introducing each concept with working examples. The formal specification (`ptern-specification.md`) is the complete reference; this guide is the on-ramp.
@@ -269,7 +271,7 @@ const nonZeroDigit = compile("%Digit excluding '0'");
 const octalDigit   = compile("%Digit excluding '8'..'9'");
 ```
 
-Both sides of `excluding` must match exactly one character.
+Both sides of `excluding` must match exactly one character. When both sides are the same expression — `%Digit excluding %Digit`, `'x' excluding 'x'`, or `'a'..'z' excluding 'a'..'z'` — the result would be an empty character class, so the compiler rejects the pattern. Semantically equivalent but textually distinct pairs (e.g. `%Digit excluding '0'..'9'`) are not caught at compile time.
 
 A practical use: matching the contents of a quoted string without letting a closing quote slip through:
 
@@ -348,12 +350,12 @@ By default, repetition is **greedy** — it consumes as many iterations as possi
 // Greedy — %Any * 1..? swallows as far as possible before stopping at '</'
 const greedy = compile("'<' %Alpha * 1..? '>' %Any * 1..? '</'");
 greedy.matchFirstIn("<b>hello</b><em>world</em>")
-// { index: 0, length: 22, captures: {} } — runs all the way to the last '</'
+// { index: 0, length: 23, captures: {} } — runs all the way to the last '</'
 
 // Lazy — stops at the first '</'
 const lazyP = compile("'<' %Alpha * 1..? '>' %Any * 1..? fewest '</'");
 lazyP.matchFirstIn("<b>hello</b><em>world</em>")
-// { index: 0, length: 11, captures: {} } — stops at the first '</'
+// { index: 0, length: 10, captures: {} } — stops at the first '</'
 ```
 
 `fewest` works with any variable-count form:
@@ -377,6 +379,8 @@ const quoted = compile("'\"' %Any excluding '\"' * 0..? '\"'");
 const bold = compile("'<b>' %Any * 0..? fewest '</b>'");
 ```
 
+Lazy repetition is still subject to the same compile-time backtracking safety checks as greedy repetition. A `fewest` quantifier on a structurally ambiguous pattern still requires `!allow-backtracking = true`.
+
 ---
 
 ## Named Captures
@@ -387,7 +391,7 @@ Add `as name` to any expression to capture the matched text under that name:
 const yearP = compile("%Digit * 4 as year");
 
 yearP.matchFirstIn("The year is 2026")
-// { index: 11, length: 4, captures: { year: "2026" } }
+// { index: 12, length: 4, captures: { year: "2026" } }
 ```
 
 The `captures` object in the result maps each capture name to the text that was matched at that position. Names that did not participate in the match (e.g. an unmatched branch of an alternation) are absent.
@@ -424,23 +428,19 @@ isoDate.replaceAllIn(
 
 ### The same name in multiple places
 
-You can reuse a capture name at more than one position in a pattern. The same replacement value is applied to every occurrence:
+A capture name is allowed to appear more than once in a pattern — the parser and validator do not reject it. What that buys you differs depending on *where* the repeat occurs:
+
+- **Inside a repeated sub-pattern** (`( ... as name ) * n..m`), every iteration's occurrence is tracked independently. This is the array-replacement mechanism described in [Captures inside repetitions](#captures-inside-repetitions) below — a `string[]` (or a broadcast scalar) reaches every occurrence.
+- **At two unrelated, non-repeated positions** in a sequence, only the *first* occurrence is wired up as a real capture; later occurrences with the same name match the same grammar but do not contribute to `captures`, and are not touched by `replace*`:
 
 ```typescript
-const tagged = compile(
-  "'<' %Alpha * 1..? as tag '>' " +
-  "%Any * 0..? as body " +
-  "'</' %Alpha * 1..? as tag '>'",
-);
+const range = compile("%Digit * 1..? as n '-' %Digit * 1..? as n");
 
-tagged.replaceFirstIn(
-  "<em>hello</em>",
-  { tag: "strong" },
-)
-// "<strong>hello</strong>"   — both occurrences of `tag` replaced
+range.matchFirstIn("12-34")?.captures      // { n: "12" } — only the first occurrence
+range.replaceFirstIn("12-34", { n: "9" })  // "9-34"      — only the first occurrence changes
 ```
 
-During matching, `captures` holds the value from the **last** matched position for each name (the closing tag in this example).
+If you need every non-repeated occurrence of a value to move together, give each position its own name and pass the same replacement value to each, or restructure the pattern so the repeated text is expressed as a repetition (see below) or a `{name}` backreference (see [Subpattern Definitions](#subpattern-definitions)).
 
 ---
 
@@ -459,7 +459,9 @@ const isoDate = compile(
 
 Each definition is `name = pattern ;`. The final line (no semicolon) is the body expression that actually matches. Definitions may reference other definitions.
 
-Every definition must be used — if a definition's name never appears in a `{name}` that is reachable from the body expression, the pattern fails to compile with an `unusedDefinition` error.
+Every definition must be used — if a definition's name never appears in a `{name}` that is reachable (directly or through other definitions) from the body expression, the pattern fails to compile with an `unusedDefinition` error. This catches dead code early and keeps patterns free of stale definitions.
+
+Definitions make the individual pieces testable in isolation and make the body readable at a glance. Compare the body to its equivalent regex fragment — `(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])` — and the ptern wins on readability every time.
 
 ### Interpolation vs. backreference
 
@@ -488,6 +490,8 @@ const element = compile(
 element.matchesAllOf("<em>hello</em>")    // true
 element.matchesAllOf("<em>hello</div>")   // false — mismatched tags
 ```
+
+Note that a backreference matches a runtime-determined string, so the backtracking checker models its character set as the same as the capture expression's. Patterns that are safe — even when a backreference appears adjacent to a variable-length repetition — compile without warnings. Use `!allow-backtracking = true` only if the static checks flag a pattern you have verified to be safe.
 
 ---
 
@@ -553,7 +557,20 @@ compile("%Digit * 1..? %Digit * 1..?")        // Error: both unbounded, %Digit�
 compile("%Digit * 1..? '-' %Digit * 1..?")    // OK: literal '-' separates them
 ```
 
-Set `!allow-backtracking = true` to opt out when a pattern is structurally safe but the static analysis cannot prove it.
+Set `!allow-backtracking = true` to opt out when a pattern is structurally safe but the static analysis cannot prove it. A real example is a double-quoted string that allows escaped quotes:
+
+```typescript
+const dqString = compile(
+  "!allow-backtracking = true\n" +
+  "char = %Any excluding '\"';\n" +
+  "'\"' ({char} | '\\\"') * 0..1000 '\"'",
+);
+
+dqString.matchesAllOf('"hello"')           // true
+dqString.matchesAllOf('"say \\"hi\\""')    // true — escaped inner quotes
+```
+
+Note that many patterns that look like they need `!allow-backtracking` can instead be fixed by tightening the character sets. A CSV field defined as `%Any * 1..100` triggers `ambiguousRepetitionBody` (last char `%Any` overlaps first char `','`), but rewriting it as `%Any excluding ',' * 1..100` removes the overlap entirely and is also more semantically correct.
 
 ---
 
@@ -573,6 +590,15 @@ const wholeWord = compile("@word-start %Alpha * 1..? @word-end");
 
 wholeWord.matchesIn("say hello there")  // true  — "hello" is a whole word
 wholeWord.matchesIn("123")              // false — no alphabetic word
+```
+
+Without the word boundaries, `%Alpha * 1..?` would match the alphabetic portion of `"hello123"`. With them, only a standalone word matches:
+
+```typescript
+const un = compile("@word-start 'un'");
+
+un.matchesIn("undo")   // true  — "un" is at a word start
+un.matchesIn("fun")    // false — "un" is mid-word
 ```
 
 For line-anchored patterns, `@line-start` and `@line-end` work across multiple lines when multiline mode is active:
@@ -615,13 +641,13 @@ const version = compile(
 );
 
 version.matchFirstIn("Using package v1.23.456 in production")
-// { index: 14, length: 8,
+// { index: 15, length: 8,
 //   captures: { major: "1", minor: "23", patch: "456" } }
 
 version.matchAllIn("v1.0.0 and v2.3.4")
 // [
 //   { index: 1,  length: 5, captures: { major: "1", minor: "0", patch: "0" } },
-//   { index: 11, length: 5, captures: { major: "2", minor: "3", patch: "4" } }
+//   { index: 12, length: 5, captures: { major: "2", minor: "3", patch: "4" } }
 // ]
 ```
 
@@ -707,6 +733,16 @@ isoDate.replaceFirstIn("2026-07-04", { month: "12" })
 // "2026-12-04"   — year and day unchanged
 ```
 
+### Round-trip consistency
+
+If you match a string and pass the captured values back as replacements, you get the original string:
+
+```typescript
+const m = isoDate.matchFirstIn("2026-07-04")!;
+isoDate.replaceAllOf("2026-07-04", m.captures)
+// "2026-07-04" — identity
+```
+
 ### Captures inside repetitions
 
 When a named capture appears inside a repeated sub-pattern, you can provide a `string[]` to replace each iteration independently:
@@ -729,6 +765,8 @@ A plain string inside a repetition is **broadcast** — it replaces every iterat
 csv.replaceFirstIn("alice,bob,carol", { col: "X" })
 // "X,X,X"
 ```
+
+If the same capture name appears both inside and outside a repetition, the array's first element fills the non-repeated occurrence and the remaining elements fill the iterations.
 
 ### All six replace methods
 
@@ -773,6 +811,21 @@ isoDate.substitute({ year: "2026", month: "07", day: "04" })
 | `"captureMismatch"`       | Provided value does not match the capture's sub-pattern |
 | `"noMatchingBranch"`      | No alternation branch could be satisfied |
 | `"arrayLengthError"`      | Array length is outside the repetition bounds |
+
+### What makes a pattern substitutable
+
+The compiler checks that every part of the pattern can produce output from capture values alone. Literal strings always can. Character classes (`%Digit`) and ranges (`'a'..'z'`) cannot — they match a set of characters but cannot choose one without being told.
+
+These patterns are substitutable:
+- A literal: `'hello'`
+- A named capture (regardless of what is inside it): `%Digit * 4 as year`
+- A sequence or alternation where every branch is substitutable
+
+These are not:
+- A bare character class: `%Digit` (which character would you pick?)
+- A bounded repetition with no named capture: `%Digit * 1..4` (how many iterations?)
+
+A bounded repetition `E * n..m` *is* substitutable if `E` contains at least one named capture — the length of the provided array drives the iteration count.
 
 ### Alternation in substitution
 
@@ -887,7 +940,7 @@ try {
 }
 ```
 
-Common semantic error kinds: `emptyLiteral`, `unusedDefinition`, `undefinedName`, `circularDefinition`, `unknownAnnotation`, `fewestOnExactRepetition`, `ambiguousRepetitionBody`, `ambiguousAdjacentRepetition`.
+Common semantic error kinds: `emptyLiteral`, `unusedDefinition`, `undefinedReference`, `circularDefinition`, `unknownAnnotation`, `fewestOnExactRepetition`, `ambiguousRepetitionBody`, `ambiguousAdjacentRepetition`.
 
 ---
 
@@ -908,32 +961,37 @@ Formatting succeeds as long as the source lexes and parses — semantic errors d
 
 ### FormatOptions
 
+`format()`'s second argument is an optional `Partial<FormatOptions>` — any fields you omit fall back to their defaults, so you only need to specify what you want to change:
+
 ```typescript
-import { format, defaultFormatOptions } from "@ptern/tern";
 import type { FormatOptions } from "@ptern/tern";
 
 // Defaults:
-const opts: FormatOptions = {
-  lineWidth: 80,   // maximum line length; must be >= 40
-  compact:   false, // strip optional whitespace around operators
-  aligned:   true,  // align = signs within annotation and definition blocks
-  reordered: false, // reorder definitions into dependency order
-};
+// {
+//   lineWidth: 80,   // maximum line length; must be >= 40
+//   compact:   false, // strip optional whitespace around operators
+//   aligned:   true,  // align = signs within annotation and definition blocks
+//   reordered: false, // reorder definitions into dependency order
+// }
+
+format(source, { compact: true })   // only override what you need
 ```
 
 ### What the formatter does
 
 **Output structure.** Sections are emitted in this order:
 
-1. Annotation block (annotations sorted lexicographically by name)
-2. Blank separator (when annotations and a subsequent section are present, and `compact: false`)
-3. Definition block (in source order, or topological order when `reordered: true`)
-4. Blank separator (when definitions and the body are present, and `compact: false`)
-5. Body expression
+1. Ptern-level doc comment block (followed by a mandatory blank line)
+2. Annotation block (annotations sorted lexicographically by name)
+3. Blank separator (when annotations and a subsequent section are both present, and `compact: false`)
+4. Definition block (in source order, or topological order when `reordered: true`)
+5. Blank separator (when definitions and the body are both present, and `compact: false`)
+6. Body doc comment block
+7. Body expression
 
 **Token normalisation.** String literals are normalised to single-quote delimiters. Double quotes are used only when the literal content contains a single-quote character. Character class names are normalised to title case (`%Alpha`, `%Digit`, etc.).
 
-**Alignment.** When `aligned: true` (the default), the `=` signs within each block are aligned to a common column:
+**Alignment.** When `aligned: true` (the default), the `=` signs within the annotation block are aligned to a common column, and the `=` signs within the definition block are aligned to a separate common column. The column is `(length of longest name in the block) + 2`.
 
 ```
 // Input (misaligned):
@@ -954,18 +1012,44 @@ const opts: FormatOptions = {
 Setting `compact: true` removes optional whitespace around operators and suppresses blank separator lines:
 
 ```typescript
-format("( 'a' | 'b' ) * 3", { ...defaultFormatOptions, compact: true })
+format("( 'a' | 'b' ) * 3", { compact: true })
 // "('a'|'b')*3"
 ```
 
-### Reordering definitions
+Keyword spacing (`as`, `excluding`) is always one space on each side regardless of `compact`.
 
-When `reordered: true`, definitions are sorted into topological layers — dependencies come before the definitions that reference them — and alphabetically within each layer:
+### Alignment disabled
 
 ```typescript
-const source = "full = {first} ' ' {last} ;\nfirst = %Alpha * 1..? ;\nlast = %Alpha * 1..? ;";
-format(source, { ...defaultFormatOptions, reordered: true })
-// "first = %Alpha * 1..? ;\nlast  = %Alpha * 1..? ;\n\nfull  = {first} ' ' {last} ;"
+const unaligned: Partial<FormatOptions> = { aligned: false };
+
+const source = "word = %Alpha * 1..? ;\ndigit = %Digit * 1..? ;\n{word} {digit}";
+format(source, unaligned)
+// "word = %Alpha * 1..? ;\ndigit = %Digit * 1..? ;\n\n{word} {digit}"
+```
+
+(Definitions are still in source order; `unaligned` only changes whether `=` signs are padded.)
+
+### Reordering definitions
+
+When `reordered: true`, definitions are sorted into topological layers — dependencies come before the definitions that reference them — and alphabetically within each layer.
+
+```typescript
+const source = "b = {a} ;\na = 'x' ;\n{b}";
+format(source, { reordered: true, aligned: false })
+// "a = 'x' ;\nb = {a} ;\n\n{b}"
+```
+
+Definitions involved in dependency cycles are placed after all successfully sorted definitions, in their original source order.
+
+### Doc comment preservation
+
+Doc comments are preserved verbatim. Item-level comments stay attached to the item they document and move with it when sorting.
+
+```typescript
+const source = "# Match any alphabetic word\n\n# Definition of word\nword = %Alpha * 1..? ;\n{word}";
+format(source)
+// "# Match any alphabetic word\n\n# Definition of word\nword  = %Alpha * 1..? ;\n\n{word}"
 ```
 
 ### Idempotency

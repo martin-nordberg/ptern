@@ -1,6 +1,6 @@
 # Ptern User Guide — Gleam API
 
-> **See also:** [TypeScript User Guide](../../documentation/typescript-user-guide.md) for the `@ptern/tern` TypeScript edition.
+> **See also:** [TypeScript User Guide](../../ptern-typescript/doc/user-guide.md) for the `@ptern/tern` TypeScript edition, or [Kotlin User Guide](../../ptern-kotlin/doc/user-guide.md) for the JVM/Kotlin edition.
 
 Ptern is a pattern language that compiles to regular expressions. It is designed to be readable first — every construct is either a plain keyword or punctuation that carries an obvious meaning. You should be able to read a ptern aloud and have it make sense.
 
@@ -364,12 +364,12 @@ By default, repetition is **greedy** — it consumes as many iterations as possi
 // Greedy — %Any * 1..? swallows as far as possible before stopping at '</'
 let assert Ok(greedy) = ptern.compile("'<' %Alpha * 1..? '>' %Any * 1..? '</'")
 ptern.match_first_in(greedy, "<b>hello</b><em>world</em>")
-// index 0, length 22 — runs all the way to the last '</'
+// index 0, length 23 — runs all the way to the last '</'
 
 // Lazy — stops at the first '</'
 let assert Ok(lazy_p) = ptern.compile("'<' %Alpha * 1..? '>' %Any * 1..? fewest '</'")
 ptern.match_first_in(lazy_p, "<b>hello</b><em>world</em>")
-// index 0, length 11 — stops at the first '</'
+// index 0, length 10 — stops at the first '</'
 ```
 
 `fewest` works with any variable-count form:
@@ -411,7 +411,7 @@ let assert Ok(year_p) = ptern.compile("%Digit * 4 as year")
 
 ptern.match_first_in(year_p, "The year is 2026")
 // Some(MatchOccurrence(
-//   index: 11, length: 4,
+//   index: 12, length: 4,
 //   captures: dict.from_list([#("year", "2026")])
 // ))
 ```
@@ -454,24 +454,27 @@ ptern.replace_all_in(
 
 ### The same name in multiple places
 
-You can reuse a capture name at more than one position in a pattern. The same replacement value is applied to every occurrence:
+A capture name is allowed to appear more than once in a pattern — the parser and resolver do not reject it. What that buys you differs depending on *where* the repeat occurs:
+
+- **Inside a repeated sub-pattern** (`( ... as name ) * n..m`), every iteration's occurrence is tracked independently. This is the array-replacement mechanism described in [Captures inside repetitions](#captures-inside-repetitions) below — a `List(String)` (or a broadcast scalar) reaches every occurrence.
+- **At two unrelated, non-repeated positions** in a sequence, only the *first* occurrence is wired up as a real capture group; later occurrences with the same name match the same grammar but do not contribute to `captures`, and are not touched by `replace_*`:
 
 ```gleam
-let assert Ok(tagged) = ptern.compile(
-  "'<' %Alpha * 1..? as tag '>'
-  %Any * 0..? as body
-  '</' %Alpha * 1..? as tag '>'",
-)
+let assert Ok(range) = ptern.compile("%Digit * 1..? as n '-' %Digit * 1..? as n")
+
+ptern.match_first_in(range, "12-34")
+// Some(MatchOccurrence(index: 0, length: 5, captures: dict.from_list([#("n", "12")])))
+// only the first occurrence
 
 ptern.replace_first_in(
-  tagged,
-  "<em>hello</em>",
-  dict.from_list([#("tag", ptern.ScalarReplacement("strong"))]),
+  range,
+  "12-34",
+  dict.from_list([#("n", ptern.ScalarReplacement("9"))]),
 )
-// Ok("<strong>hello</strong>")   — both occurrences of `tag` replaced
+// Ok("9-34")   — only the first occurrence changes
 ```
 
-During matching, `captures` holds the value from the **last** matched position for each name (the closing tag in this example).
+If you need every non-repeated occurrence of a value to move together, give each position its own name and pass the same replacement value to each, or restructure the pattern so the repeated text is expressed as a repetition (see above) or a `{name}` backreference (see [Subpattern Definitions](#subpattern-definitions)).
 
 ---
 
@@ -710,14 +713,14 @@ let assert Ok(version) = ptern.compile(
 
 ptern.match_first_in(version, "Using package v1.23.456 in production")
 // Some(MatchOccurrence(
-//   index: 14, length: 8,
+//   index: 15, length: 8,
 //   captures: dict.from_list([#("major", "1"), #("minor", "23"), #("patch", "456")])
 // ))
 
 ptern.match_all_in(version, "v1.0.0 and v2.3.4")
 // [
 //   MatchOccurrence(index: 1,  length: 5, captures: dict.from_list([#("major","1"), #("minor","0"), #("patch","0")])),
-//   MatchOccurrence(index: 11, length: 5, captures: dict.from_list([#("major","2"), #("minor","3"), #("patch","4")]))
+//   MatchOccurrence(index: 12, length: 5, captures: dict.from_list([#("major","2"), #("minor","3"), #("patch","4")]))
 // ]
 ```
 
@@ -1108,9 +1111,9 @@ Keyword spacing (`as`, `excluding`) is always one space on each side regardless 
 ```gleam
 let unaligned = ptern.FormatOptions(..ptern.default_format_options(), aligned: False)
 
-let source = "year = %Digit * 4 ;\nmonth = %Digit * 2 ;"
+let source = "word = %Alpha * 1..? ;\ndigit = %Digit * 1..? ;\n{word} {digit}"
 ptern.format(source, unaligned)
-// Ok("month = %Digit * 2 ;\nyear = %Digit * 4 ;")
+// Ok("word = %Alpha * 1..? ;\ndigit = %Digit * 1..? ;\n\n{word} {digit}")
 ```
 
 (Definitions are still in source order; `unaligned` only changes whether `=` signs are padded.)
@@ -1120,11 +1123,11 @@ ptern.format(source, unaligned)
 When `reordered: True`, definitions are sorted into topological layers — dependencies come before the definitions that reference them — and alphabetically within each layer.
 
 ```gleam
-let reorder = ptern.FormatOptions(..ptern.default_format_options(), reordered: True)
+let reorder = ptern.FormatOptions(..ptern.default_format_options(), reordered: True, aligned: False)
 
-let source = "full = {first} ' ' {last} ;\nfirst = %Alpha * 1..? ;\nlast = %Alpha * 1..? ;"
+let source = "b = {a} ;\na = 'x' ;\n{b}"
 ptern.format(source, reorder)
-// Ok("first = %Alpha * 1..? ;\nlast  = %Alpha * 1..? ;\n\nfull  = {first} ' ' {last} ;")
+// Ok("a = 'x' ;\nb = {a} ;\n\n{b}")
 ```
 
 Definitions involved in dependency cycles are placed after all successfully sorted definitions, in their original source order.
@@ -1136,7 +1139,7 @@ Doc comments are preserved verbatim. Item-level comments stay attached to the it
 ```gleam
 let source = "# Match any alphabetic word\n\n# Definition of word\nword = %Alpha * 1..? ;\n{word}"
 ptern.format(source, ptern.default_format_options())
-// Ok("# Match any alphabetic word\n\n# Definition of word\nword = %Alpha * 1..? ;\n\n{word}")
+// Ok("# Match any alphabetic word\n\n# Definition of word\nword  = %Alpha * 1..? ;\n\n{word}")
 ```
 
 ### Idempotency

@@ -45,7 +45,8 @@ This document specifies the Ptern source language: its lexical structure, gramma
 Language-specific APIs are documented separately per edition:
 
 - **Gleam:** `ptern-gleam/doc/user-guide.md`
-- **TypeScript:** `documentation/typescript-user-guide.md`
+- **TypeScript:** `ptern-typescript/doc/user-guide.md`
+- **Kotlin:** `ptern-kotlin/doc/user-guide.md`
 
 ---
 

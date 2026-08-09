@@ -54,7 +54,7 @@ format("!case-insensitive=true\nword=%Alpha*1..?;\n{word}")
 
 ## Documentation
 
-- **[TypeScript User Guide](../documentation/typescript-user-guide.md)** — full guide with examples for every feature
+- **[TypeScript User Guide](doc/user-guide.md)** — full guide with examples for every feature
 - **[Language Specification](../documentation/ptern-specification.md)** — formal grammar and operational semantics
 
 ## Errors
