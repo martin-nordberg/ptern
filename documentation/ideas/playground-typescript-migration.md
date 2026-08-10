@@ -99,7 +99,7 @@ Everything else the playground needs is already public and already matches or tr
 }
 ```
 
-No root lockfile policy change is forced by this — running `bun install` from the repo root will produce a root `bun.lock` covering both workspace packages and symlink `ptern-playground/node_modules/@ptern/tern` → `../../ptern-typescript`. The existing per-package `bun.lock` files in `ptern-typescript/` and `ptern-playground/` are superseded by the root lockfile and should be removed once the workspace is set up (documented as a one-time migration step, §11 Phase 1).
+No root lockfile policy change is forced by this — running `bun install` from the repo root will produce a root `bun.lock` covering both workspace packages and symlink `ptern-playground/node_modules/@ptern/tern` → `../../../ptern-typescript`. The existing per-package `bun.lock` files in `ptern-typescript/` and `ptern-playground/` are superseded by the root lockfile and should be removed once the workspace is set up (documented as a one-time migration step, §11 Phase 1).
 
 `ptern-typescript`'s and `ptern-playground`'s own scripts (`bun test`, `bun run build`, `bun run dev`, etc.) continue to work unchanged when run from within their own directories — workspaces are additive for cross-package resolution and don't change how a package's own scripts execute.
 
@@ -350,11 +350,12 @@ No automated test suite exists for `ptern-playground` today (UI-only, manual-QA 
 - [x] Add a unit test covering the three methods. Added inline to `ptern-typescript/test/driver.test.ts` (in a new `introspection/*` `describe` block) rather than a new `test/api/` file — the existing test suite is a single fixture-driven file, `test/driver.test.ts`, with TypeScript-only inline `describe` blocks already living alongside the shared-fixture ones for cases not modeled in the cross-language `test-fixtures/` corpus (e.g. `array replacement/*`, `substitute/array per iteration`). These new getters aren't (yet) part of that shared corpus, so they follow the same inline pattern.
 - [x] Document the three methods in `ptern-typescript/doc/user-guide.md` — added as a new "Inspecting a Compiled Ptern" section after "Length Metadata", with real (not fabricated) example output.
 
-### Phase 1 — Workspace setup
-- [ ] Add root `package.json` with `"workspaces": ["ptern-typescript", "ptern-playground"]`.
-- [ ] Remove `ptern-typescript/bun.lock` and `ptern-playground/bun.lock`; run `bun install` from the repo root to generate a single root `bun.lock`.
-- [ ] Add `ptern-typescript/.gitignore` (`dist/`).
-- [ ] Add `"@ptern/tern": "workspace:*"` to `ptern-playground/package.json` `dependencies`.
+### Phase 1 — Workspace setup — done
+- [x] Add root `package.json` with `"workspaces": ["ptern-typescript", "ptern-playground"]`.
+- [x] Remove `ptern-typescript/bun.lock` and `ptern-playground/bun.lock`; run `bun install` from the repo root to generate a single root `bun.lock`. Verified the workspace symlink resolves correctly: `ptern-playground/node_modules/@ptern/tern -> ../../../ptern-typescript` (bun placed dependencies package-locally rather than hoisting to root `node_modules`, which is empty — functionally equivalent for resolution purposes, nothing further needed).
+- [x] Add `ptern-typescript/.gitignore` (`dist/`, plus `node_modules/` for anyone installing directly inside the package).
+- [x] Add `"@ptern/tern": "workspace:*"` to `ptern-playground/package.json` `dependencies`.
+- [x] **Unplanned but required:** `ptern-typescript/package.json` had no direct `@types/node` dependency — it only got one transitively via `bun-types`' `"@types/node": "*"`. Standalone, that wildcard resolved to whatever was newest at install time (`25.9.1`, confirmed clean against `bun run typecheck`). Inside the workspace, bun's cross-package deduplication instead resolved a single shared `@types/node` satisfying both bun-types' `*` and `ptern-playground`'s pre-existing `"@types/node": "^24.12.3"` devDependency, landing on `24.13.3` — and `bun-types@1.3.14`'s declarations don't match `@types/node@24.13.3`'s API surface (four `tsc` errors: `ConnectionOptions`, `KeyObject`, `TLSSocket`, `TextEncoderEncodeIntoResult` all failed to resolve). Rather than pin `ptern-playground`'s unrelated devDependency to placate `ptern-typescript`'s transitive need (fragile — the coupling would silently break again the next time either range shifts), added an explicit `"@types/node": "^25.0.0"` devDependency directly to `ptern-typescript/package.json`. This makes `ptern-typescript` install its own separate, compatible copy regardless of what any sibling workspace package declares — `bun run typecheck` is clean again, and `ptern-playground` is untouched. General lesson for later phases: a workspace's dependency deduplication can change *which* transitively-resolved version a package gets, even when nothing in that package's own `package.json` changed — worth a second `bun run typecheck` pass after any future dependency change in either package.
 
 ### Phase 2 — Build pipeline
 - [ ] Replace `ptern-playground/package.json`'s `copy-gleam`/`dev`/`build` scripts per §5.2.

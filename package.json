@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "workspaces": [
+    "ptern-typescript",
+    "ptern-playground"
+  ]
+}
