@@ -8,7 +8,7 @@ import { compile, format, PternFormatError, PternCompileError, PternReplacementE
 import { validate } from "../src/semantic/validator";
 import { resolve } from "../src/semantic/resolver";
 import { check } from "../src/semantic/backtracking";
-import type { ParsedPtern } from "../src/parser/ast";
+import type { Atom, ParsedPtern, RangeItem } from "../src/parser/ast";
 import type { SemanticError } from "../src/semantic/error";
 
 const fixturesDir = join(import.meta.dir, "../../test-fixtures");
@@ -23,6 +23,15 @@ function lexAndParse(input: string): ParsedPtern {
   const ast = parse(tokens);
   if ("kind" in ast) throw new Error("parse failed: " + JSON.stringify(ast));
   return ast as ParsedPtern;
+}
+
+// Narrows a RangeItem to its `singleAtom` variant's `atom`, for tests whose
+// input is known not to be a char range (e.g. not `'a'..'z'`).
+function singleAtomOf(item: RangeItem | undefined): Atom {
+  if (item?.kind !== "singleAtom") {
+    throw new Error("expected a singleAtom RangeItem, got: " + JSON.stringify(item));
+  }
+  return item.atom;
 }
 
 // ---------------------------------------------------------------------------
@@ -331,25 +340,25 @@ describe("fixtures/format", () => {
 describe("parser/atom types", () => {
   it("parses single-quoted literal", () => {
     const ast = lexAndParse("'hello'");
-    const atom = ast.body.alternatives[0]?.items[0]?.inner.inner.base.atom;
+    const atom = singleAtomOf(ast.body.alternatives[0]?.items[0]?.inner.inner.base);
     expect(atom).toEqual({ kind: "literal", content: "hello" });
   });
 
   it("parses double-quoted literal", () => {
     const ast = lexAndParse('"world"');
-    const atom = ast.body.alternatives[0]?.items[0]?.inner.inner.base.atom;
+    const atom = singleAtomOf(ast.body.alternatives[0]?.items[0]?.inner.inner.base);
     expect(atom).toEqual({ kind: "literal", content: "world" });
   });
 
   it("parses char class", () => {
     const ast = lexAndParse("%Digit");
-    const atom = ast.body.alternatives[0]?.items[0]?.inner.inner.base.atom;
+    const atom = singleAtomOf(ast.body.alternatives[0]?.items[0]?.inner.inner.base);
     expect(atom).toEqual({ kind: "charClass", name: "Digit" });
   });
 
   it("parses group", () => {
     const ast = lexAndParse("('a' | 'b')");
-    const atom = ast.body.alternatives[0]?.items[0]?.inner.inner.base.atom;
+    const atom = singleAtomOf(ast.body.alternatives[0]?.items[0]?.inner.inner.base);
     expect(atom?.kind).toBe("group");
     if (atom?.kind === "group") expect(atom.inner.alternatives).toHaveLength(2);
   });
@@ -362,13 +371,13 @@ describe("parser/atom types", () => {
 
   it("parses position assertion", () => {
     const ast = lexAndParse("@word-start %Alpha * 1..?");
-    const atom = ast.body.alternatives[0]?.items[0]?.inner.inner.base.atom;
+    const atom = singleAtomOf(ast.body.alternatives[0]?.items[0]?.inner.inner.base);
     expect(atom).toEqual({ kind: "positionAssertion", name: "word-start" });
   });
 
   it("parses interpolation", () => {
     const ast = lexAndParse("d = %Digit;\n{d}");
-    const atom = ast.body.alternatives[0]?.items[0]?.inner.inner.base.atom;
+    const atom = singleAtomOf(ast.body.alternatives[0]?.items[0]?.inner.inner.base);
     expect(atom).toEqual({ kind: "interpolation", name: "d" });
   });
 });
