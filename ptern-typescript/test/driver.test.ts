@@ -687,6 +687,46 @@ describe("capture/__rep_N filtered from results", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Introspection: regexSource / regexFlags / isSubstitutable
+// (TypeScript-only: not yet part of the shared cross-language api.json fixtures)
+// ---------------------------------------------------------------------------
+
+describe("introspection/regexSource and regexFlags", () => {
+  it("regexSource is a non-empty regex source string", () => {
+    const p = compile("%Digit * 4 as year");
+    expect(p.regexSource().length).toBeGreaterThan(0);
+    expect(new RegExp(p.regexSource(), p.regexFlags()).test("2026")).toBe(true);
+  });
+
+  it("regexFlags always includes the 'd' (hasIndices) flag", () => {
+    const p = compile("'hello'");
+    expect(p.regexFlags()).toContain("d");
+  });
+
+  it("regexFlags includes 'i' when !case-insensitive is set", () => {
+    const p = compile("!case-insensitive = true\n'hello'");
+    expect(p.regexFlags()).toContain("i");
+  });
+
+  it("regexFlags includes 'm' when !multiline is set", () => {
+    const p = compile("!multiline = true\n@line-start 'hello'");
+    expect(p.regexFlags()).toContain("m");
+  });
+});
+
+describe("introspection/isSubstitutable", () => {
+  it("is false when !substitutable is not set", () => {
+    const p = compile("%Digit * 4 as year");
+    expect(p.isSubstitutable()).toBe(false);
+  });
+
+  it("is true when !substitutable = true is set", () => {
+    const p = compile("!substitutable = true\n%Digit * 4 as year");
+    expect(p.isSubstitutable()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Array replacement (TypeScript-only: per-iteration semantics differ in Kotlin)
 // ---------------------------------------------------------------------------
 

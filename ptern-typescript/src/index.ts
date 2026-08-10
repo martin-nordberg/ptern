@@ -199,6 +199,7 @@ export class Ptern {
   readonly #isSubstitutable: boolean;
   readonly #ignoreSubstitutionMatching: boolean;
   readonly #substitutionPlan: SubstitutionPlan | null;
+  readonly #source: string;
   readonly #flags: string;
   readonly #repInfoList: [string, string, string[]][];
 
@@ -215,7 +216,7 @@ export class Ptern {
     isSubstitutable: boolean,
     ignoreSubstitutionMatching: boolean,
     substitutionPlan: SubstitutionPlan | null,
-    _source: string,
+    source: string,
     flags: string,
     repInfoList: [string, string, string[]][],
   ) {
@@ -231,6 +232,7 @@ export class Ptern {
     this.#isSubstitutable = isSubstitutable;
     this.#ignoreSubstitutionMatching = ignoreSubstitutionMatching;
     this.#substitutionPlan = substitutionPlan;
+    this.#source = source;
     this.#flags = flags;
     this.#repInfoList = repInfoList;
   }
@@ -383,6 +385,18 @@ export class Ptern {
 
   maxLength(): number | null {
     return this.#maxLen;
+  }
+
+  isSubstitutable(): boolean {
+    return this.#isSubstitutable;
+  }
+
+  regexSource(): string {
+    return this.#source;
+  }
+
+  regexFlags(): string {
+    return this.#flags;
   }
 
   // ---------------------------------------------------------------------------

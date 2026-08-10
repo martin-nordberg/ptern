@@ -700,6 +700,22 @@ Position assertions contribute zero to both bounds. This lets you use ptern as a
 
 ---
 
+## Inspecting a Compiled Ptern
+
+`isSubstitutable()`, `regexSource()`, and `regexFlags()` expose facts about a compiled `Ptern` beyond what's needed for matching, replacing, or substituting — useful for building tooling (an editor integration, a debug panel, a logging statement) on top of the library:
+
+```typescript
+const p = compile("!substitutable = true\n%Digit * 4 as year");
+
+p.isSubstitutable()   // true — reflects whether `!substitutable = true` was set
+p.regexSource()       // "(?<year>[0-9]{4})" — the compiled regex source (implementation detail; not stable across releases)
+p.regexFlags()        // "vd" — always includes "d" (hasIndices) and "v" (Unicode sets mode); "i" and "m" are added when `!case-insensitive`/`!multiline` are set
+```
+
+`regexSource()` and `regexFlags()` describe the *internal* regex used for the pattern's boolean/occurrence match operations — they are not meant to be parsed or relied on for their exact structure (that can change between releases as the compiler evolves), only displayed or logged. `new RegExp(p.regexSource(), p.regexFlags())` reconstructs a working equivalent of what the library uses internally.
+
+---
+
 ## Replacement in Depth
 
 Replacement modifies a string by substituting new text at the positions of named captures, leaving everything else unchanged.

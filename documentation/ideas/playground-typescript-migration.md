@@ -208,9 +208,9 @@ All the Gleam-runtime plumbing (`isOk`, `gleamListToArray`, `gleamDictToRecord`,
 | `substitute(p, captures)` | `gleamPtern.substitute(...)` → `Result` | `try { return p.substitute(captures as ReplacementMap) } catch (e) { if (e instanceof PternSubstitutionError) return convertSubstitutionError(e.substitutionError) }` |
 | `getMinLength(p)` | `gleamPtern.min_length(p)` | `p.minLength()` |
 | `getMaxLength(p)` | unwrap `gleamPtern.max_length(p)` `Option` | `p.maxLength()` (already `number \| null`) |
-| `isSubstitutable(p)` | `(p).is_substitutable` (raw field access) | `p.isSubstitutable` (new getter, §3.1) |
-| `getRegexSource(p)` | `(p).source` (raw field access) | `p.regexSource` (new getter, §3.1) |
-| `getRegexFlags(p)` | `(p).flags` (raw field access) | `p.regexFlags` (new getter, §3.1) |
+| `isSubstitutable(p)` | `(p).is_substitutable` (raw field access) | `p.isSubstitutable()` (new method, §3.1/Phase 0 — implemented as a method, not a property getter, to match `minLength()`/`maxLength()`'s existing convention) |
+| `getRegexSource(p)` | `(p).source` (raw field access) | `p.regexSource()` (new method, §3.1/Phase 0) |
+| `getRegexFlags(p)` | `(p).flags` (raw field access) | `p.regexFlags()` (new method, §3.1/Phase 0) |
 
 `CaptureInput` (`Record<string, string | string[]>`) is already exactly the shape `ptern-typescript`'s `ReplacementMap` wants — no conversion function (`jsToGleamReplacementDict`) is needed at all; `captures` is passed straight through.
 
@@ -344,11 +344,11 @@ No automated test suite exists for `ptern-playground` today (UI-only, manual-QA 
 
 ## 11. Work Breakdown
 
-### Phase 0 — Upstream `ptern-typescript` changes (§3)
-- [ ] Store the compiled regex source in a `#source` private field (currently discarded).
-- [ ] Add `regexSource`, `regexFlags`, `isSubstitutable` getters to `Ptern`.
-- [ ] Add a unit test covering the three getters.
-- [ ] Document the three getters in `ptern-typescript/doc/user-guide.md`.
+### Phase 0 — Upstream `ptern-typescript` changes (§3) — done
+- [x] Store the compiled regex source in a `#source` private field (currently discarded).
+- [x] Add `regexSource`, `regexFlags`, `isSubstitutable` accessors to `Ptern`. Implemented as zero-arg methods (`regexSource()`, `regexFlags()`, `isSubstitutable()`), not property getters as originally sketched in §3.1 — matches the existing convention on `Ptern` (`minLength()`, `maxLength()`, etc., are all methods; there are no property getters anywhere on the class). §6.3's mapping table and any `api.ts` implementation should call them as methods (`p.isSubstitutable()`, `p.regexSource()`, `p.regexFlags()`), not as `p.isSubstitutable`/`p.regexSource`/`p.regexFlags`.
+- [x] Add a unit test covering the three methods. Added inline to `ptern-typescript/test/driver.test.ts` (in a new `introspection/*` `describe` block) rather than a new `test/api/` file — the existing test suite is a single fixture-driven file, `test/driver.test.ts`, with TypeScript-only inline `describe` blocks already living alongside the shared-fixture ones for cases not modeled in the cross-language `test-fixtures/` corpus (e.g. `array replacement/*`, `substitute/array per iteration`). These new getters aren't (yet) part of that shared corpus, so they follow the same inline pattern.
+- [x] Document the three methods in `ptern-typescript/doc/user-guide.md` — added as a new "Inspecting a Compiled Ptern" section after "Length Metadata", with real (not fabricated) example output.
 
 ### Phase 1 — Workspace setup
 - [ ] Add root `package.json` with `"workspaces": ["ptern-typescript", "ptern-playground"]`.
