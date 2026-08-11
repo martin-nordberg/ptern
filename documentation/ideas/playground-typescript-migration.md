@@ -369,12 +369,14 @@ No automated test suite exists for `ptern-playground` today (UI-only, manual-QA 
 
   Full `bun run dev`/`bun run build` + `vite preview` end-to-end (with the real `api.ts`) will be (re-)verified as part of Phase 4's testing checklist (§9), once Phase 3 lands.
 
-### Phase 3 — `api.ts` rewrite
-- [ ] Rewrite imports and delete Gleam-runtime helper functions (§6.1).
-- [ ] Re-point/re-derive the exported types onto `ptern-typescript`'s types (§6.2).
-- [ ] Rewrite every exported function per the mapping table (§6.3).
-- [ ] Rewrite `formatLexError`/`formatParseError`/`formatSemanticError`/`convertReplacementError`/`convertSubstitutionError` per §6.4.
-- [ ] Fix the `SubstitutionError` `'lengthError'` case's `max` field type (`number` → `number | null`).
+### Phase 3 — `api.ts` rewrite — done
+- [x] Rewrite imports and delete Gleam-runtime helper functions (§6.1). `isOk`, `gleamListToArray`, `gleamDictToRecord`, `jsToGleamReplacementDict`, `convertOccurrence`, `unwrapOccurrenceOption` are all gone — `@ptern/tern` already returns/throws plain JS values.
+- [x] Re-point/re-derive the exported types onto `ptern-typescript`'s types (§6.2). `MatchOccurrence` and `FormatOptions` are now direct aliases (`= EngineMatchOccurrence` / `= EngineFormatOptions`); `CaptureInput` is now `= ReplacementMap` (an alias, not just a structurally-identical separate type, per §6.3's note that no conversion is needed). `CompileError`/`ReplacementError`/`SubstitutionError` keep their existing shorter `kind` strings, unchanged for downstream files.
+- [x] Rewrite every exported function per the mapping table (§6.3). One small deviation: `compilePtern`'s error conversion was pulled out into its own `convertCompileError()` helper (mirroring `convertReplacementError`/`convertSubstitutionError`) rather than an inline `switch` inside the `catch` block — cleaner, and its own explicit `CompileError` return type makes TypeScript enforce switch-exhaustiveness there directly rather than relying on control-flow analysis of a `try/catch` body.
+- [x] Rewrite `formatLexError`/`formatParseError`/`formatSemanticError`/`convertReplacementError`/`convertSubstitutionError` per §6.4, including the two new `formatParseError` cases (`orphanedComment`, `trailingComment`) that the original Gleam-based code never handled. `formatSemanticError`'s switch is exhaustive over every named case with a `default` branch for `duplicateCapture` (per §6.4's note that `compile()` already filters it out before it can reach here) — TypeScript narrows the `default` branch to exactly that one remaining variant, so the fallback message can still safely reference `e.name`.
+- [x] Fix the `SubstitutionError` `'lengthError'` case's `max` field type (`number` → `number | null`) — done as part of aligning the whole type with `@ptern/tern`'s.
+
+**Verification** (beyond `tsc -b`/`vite build` succeeding — see below): wrote a throwaway, uncommitted functional test script (`ptern-playground/verify.ts`, deleted after use — not part of this repo's test suite, since none exists for the playground) exercising every exported function against real compiled patterns: successful compile + all four compile-error kinds (lex/parse/two flavors of semantic, including the two new parse-error cases via patterns specifically constructed to trigger `orphanedComment`/`trailingComment`), boolean/occurrence/array matching, scalar and array replacement (including an invalid-value error and the CSV array-replacement case), substitution success and a `missingCapture` error, `getDefaultFormatOptions`/`formatPtern` (including confirming the exact aligned-output spacing — my first attempt at this check had the *test's* expectation wrong, not the code — this exact example's aligned-output spacing was already established when the `ptern-typescript`/`ptern-kotlin` user guides were verified against the live engine), and the three Phase 0 introspection methods including round-tripping `new RegExp(regexSource(), regexFlags())` against real input. All checks passed.
 
 ### Phase 4 — Cleanup and verification
 - [ ] Remove Gleam-copy entries from `ptern-playground/.gitignore`.
