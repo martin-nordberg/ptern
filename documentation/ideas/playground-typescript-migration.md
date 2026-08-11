@@ -1,6 +1,6 @@
 # Ptern Playground — TypeScript Engine Migration Plan
 
-**Status:** Draft
+**Status:** Done — all phases (0–4) implemented and verified; kept as a historical record, matching `typescript-port.md`/`kotlin-port.md`.
 **Date:** 2026-08-09
 
 ---
@@ -378,10 +378,10 @@ No automated test suite exists for `ptern-playground` today (UI-only, manual-QA 
 
 **Verification** (beyond `tsc -b`/`vite build` succeeding — see below): wrote a throwaway, uncommitted functional test script (`ptern-playground/verify.ts`, deleted after use — not part of this repo's test suite, since none exists for the playground) exercising every exported function against real compiled patterns: successful compile + all four compile-error kinds (lex/parse/two flavors of semantic, including the two new parse-error cases via patterns specifically constructed to trigger `orphanedComment`/`trailingComment`), boolean/occurrence/array matching, scalar and array replacement (including an invalid-value error and the CSV array-replacement case), substitution success and a `missingCapture` error, `getDefaultFormatOptions`/`formatPtern` (including confirming the exact aligned-output spacing — my first attempt at this check had the *test's* expectation wrong, not the code — this exact example's aligned-output spacing was already established when the `ptern-typescript`/`ptern-kotlin` user guides were verified against the live engine), and the three Phase 0 introspection methods including round-tripping `new RegExp(regexSource(), regexFlags())` against real input. All checks passed.
 
-### Phase 4 — Cleanup and verification
-- [ ] Remove Gleam-copy entries from `ptern-playground/.gitignore`.
-- [ ] Delete any locally-generated `src/ptern/{ptern,gleam_stdlib,gleam_version*,prelude.mjs}` from the working tree if present.
-- [ ] `grep -ri gleam ptern-playground` returns nothing outside historical comments/docs (confirms the "no dependency on ptern-gleam" goal).
-- [ ] Run the full manual verification checklist (§9).
-- [ ] Update `documentation/ideas/playground.md` per §8.
-- [ ] Update `ptern-playground/README.md` per §7's note.
+### Phase 4 — Cleanup and verification — done
+- [x] Remove Gleam-copy entries from `ptern-playground/.gitignore`.
+- [x] Delete any locally-generated `src/ptern/{ptern,gleam_stdlib,gleam_version*,prelude.mjs}` from the working tree if present — none were present (never regenerated since Phase 2 deleted `copy-gleam.sh`).
+- [x] `grep -ri gleam ptern-playground` returns nothing at all now (not even in historical comments/docs — the goal ended up fully met, not just "outside" some remaining historical mentions).
+- [x] Run the full manual verification checklist (§9) — **done via real browser automation, not just headless functional testing.** No `chromium-cli` (the `run` skill's preferred tool) or system Chromium was available in this environment, and `playwright install --with-deps` couldn't run (`sudo` requires a TTY this environment doesn't have). Worked around it without root: `apt-get download` (no root required) the four missing shared libraries (`libnspr4`, `libnss3`, `libasound2t64`, plus their transitive `libnssutil3`/`libsmime3`), `dpkg-deb -x` them into a scratch directory, and pointed `LD_LIBRARY_PATH` at it for the Playwright-launched Chromium process. Then drove `bun run dev`'s live dev server with a Playwright script covering every item in §9's checklist end to end — valid/lex-error/parse-error/semantic-error compile states, min/max length and the "Show regex" panel, Format + Format Options (including toggling Compact and saving), Copy-button confirmation, Match/Replace mode (all four boolean badges, all five occurrence/replacement result blocks, an invalid-replacement-value error, and the CSV array-replacement case), Substitution mode (success and a `MissingCapture` error), and a page reload confirming local-storage state persistence. **Zero browser console errors** across the whole run; screenshots confirmed correct visual rendering, not just correct DOM text content. This was a one-off local verification, not a checked-in test suite or CI step — the scratch Playwright script, screenshots, and extracted `.deb` libraries were discarded afterward, not committed.
+- [x] Update `documentation/ideas/playground.md` per §8 — §1, §2, §2.1 (renamed from "Gleam Output Integration" to "Engine Integration"), §2.2, and §9.14 all updated to describe the `@ptern/tern` workspace dependency; also corrected a pre-existing inaccuracy while in the area (§2 claimed a hand-written `src/ptern/ptern.d.ts` declaration file that was never actually part of the real implementation — the actual typed surface was always `api.ts` itself).
+- [x] Update `ptern-playground/README.md` per §7's note — replaced the generic Solid-template `npm install`/`npm run *` instructions (never accurate for this project, which has always used Bun) with the actual `bun install`-from-repository-root requirement and a note that `dev`/`build` build `@ptern/tern` first.

@@ -12,13 +12,6 @@ dist
 dist-ssr
 *.local
 
-# Generated Gleam output (rebuilt by scripts/copy-gleam.sh)
-src/ptern/ptern/
-src/ptern/gleam_stdlib/
-src/ptern/gleam_version
-src/ptern/gleam_version/
-src/ptern/prelude.mjs
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

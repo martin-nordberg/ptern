@@ -7,9 +7,9 @@
 
 ## 1. Overview
 
-The Ptern Playground is a browser-based interactive environment for writing, formatting, and testing Ptern patterns without writing host-language code. It depends only on the transpiled JavaScript output of the Gleam implementation and runs entirely client-side.
+The Ptern Playground is a browser-based interactive environment for writing, formatting, and testing Ptern patterns without writing host-language code. It depends on the `ptern-typescript` engine (`@ptern/tern`) and runs entirely client-side.
 
-The playground is a self-contained project located in the `ptern-playground/` subdirectory of the repository, alongside `ptern-gleam/`. It consumes the compiled output of `ptern-gleam/` as a local dependency.
+The playground is a self-contained project located in the `ptern-playground/` subdirectory of the repository, alongside `ptern-typescript/`. It consumes `@ptern/tern` as a local Bun workspace dependency — not from the npm registry, and not by copying files into its own source tree. (Earlier versions of the playground consumed the transpiled output of `ptern-gleam/` instead, copied into `src/ptern/` by a build script; see `documentation/ideas/playground-typescript-migration.md` for that migration's details and rationale.)
 
 ---
 
@@ -22,25 +22,24 @@ The playground is a self-contained project located in the `ptern-playground/` su
 | Styling | TailwindCSS |
 | Build tool | Vite |
 | Dev runtime | Bun |
-| Ptern engine | Transpiled Gleam output (ES module) |
+| Ptern engine | `@ptern/tern` (`ptern-typescript/`), local Bun workspace dependency |
 
-The playground is written in TypeScript throughout. It imports the compiled Gleam output as a plain ES module and calls the public Ptern API directly in the browser. No server is required at runtime.
+The playground is written in TypeScript throughout. It imports `@ptern/tern` as a normal npm-shaped package and calls its public API directly in the browser. No server is required at runtime.
 
-The Gleam output is untyped JavaScript; a thin TypeScript declaration file (`src/ptern/ptern.d.ts`) provides types for the public API surface consumed by the playground.
+`@ptern/tern` ships its own generated TypeScript declarations (built to `dist/index.d.ts`), so no hand-written declaration file is needed. `ptern-playground/src/ptern/api.ts` is a thin typed facade over it — the seam every other file in the app imports through, so the underlying engine can change without touching UI code.
 
-### 2.1 Gleam Output Integration
+### 2.1 Engine Integration
 
-The compiled Gleam JavaScript is not imported directly from `ptern-gleam/build/`; instead it is copied into `ptern-playground/src/ptern/` as part of the dev/build script. This keeps the playground project self-contained within Vite's project root. The copy includes the `ptern` package output and all transitive Gleam stdlib dependencies.
+`@ptern/tern` is a real npm-shaped package (`package.json` with `exports`/`types`/`files`) built from `ptern-typescript/`, a sibling project in this repository. The playground depends on it via a Bun workspace (`"@ptern/tern": "workspace:*"` in `ptern-playground/package.json`, with a root-level `package.json` declaring both as workspace members) rather than the npm registry — `bun install` at the repository root symlinks it into `ptern-playground/node_modules/@ptern/tern`. No files are copied into the playground's own source tree.
 
 ### 2.2 Dev and Build Script
 
-A single combined script (e.g. `bun run dev`) performs the following steps in order:
+A single combined script (`bun run dev`) performs the following steps in order:
 
-1. Run `gleam build` in `ptern-gleam/` to produce the compiled JavaScript output.
-2. Copy the relevant output files into `ptern-playground/src/ptern/`.
-3. Start the Vite dev server.
+1. Run `bun run build` in `ptern-typescript/` to produce its compiled output (`dist/`), which `@ptern/tern`'s `exports` field points to.
+2. Start the Vite dev server.
 
-The production build script follows the same steps 1–2, then runs `vite build` in place of step 3.
+The production build script follows the same step 1, then runs `tsc -b && vite build` in place of step 2.
 
 ---
 
@@ -398,4 +397,4 @@ URL-based state encoding is not used: a pattern with several definitions and mul
 | ~~9.11~~ | ~~How to expose `replace_next_in`'s `start_index` in the UI?~~ Resolved: omitted from the playground. |
 | ~~9.12~~ | ~~What is the local storage JSON schema?~~ Resolved: see §8.1–8.2. |
 | ~~9.13~~ | ~~What is the deployment target?~~ Resolved: manual static hosting for now; GitHub Pages is a future option if the library warrants a public presence. |
-| ~~9.14~~ | ~~What is the top-level directory structure of `ptern-playground/`?~~ Resolved: standard SolidJS (Vite) template structure; Gleam output copied into `src/ptern/` including stdlib dependencies. |
+| ~~9.14~~ | ~~What is the top-level directory structure of `ptern-playground/`?~~ Resolved: standard SolidJS (Vite) template structure; the ptern engine (`@ptern/tern`) is consumed as a Bun workspace dependency rather than copied into `src/ptern/` — see `documentation/ideas/playground-typescript-migration.md`. |

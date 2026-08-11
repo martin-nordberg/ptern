@@ -1,23 +1,25 @@
 ## Usage
 
+This project is part of a Bun workspace (the repository root `package.json`), together with `../ptern-typescript`, whose `@ptern/tern` package is the ptern engine this playground uses. Run `bun install` from the **repository root**, not from inside `ptern-playground/` — that's what sets up the `@ptern/tern` workspace symlink.
+
 ```bash
-$ npm install # or pnpm install or yarn install
+$ bun install   # from the repository root
 ```
 
 ### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
 
 ## Available Scripts
 
-In the project directory, you can run:
+In this directory, you can run:
 
-### `npm run dev`
+### `bun run dev`
 
-Runs the app in the development mode.<br>
+Builds `@ptern/tern` (`bun run build` in `../ptern-typescript`) and then runs the app in development mode.<br>
 Open [http://localhost:5173](http://localhost:5173) to view it in the browser.
 
-### `npm run build`
+### `bun run build`
 
-Builds the app for production to the `dist` folder.<br>
+Builds `@ptern/tern` first, then type-checks and builds the app for production to the `dist` folder.<br>
 It correctly bundles Solid in production mode and optimizes the build for the best performance.
 
 The build is minified and the filenames include the hashes.<br>
