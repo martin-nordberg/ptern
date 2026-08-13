@@ -1,0 +1,72 @@
+// Suggested dev container for ptern.
+//
+// STATUS: proposal, living in documentation/ideas/ — not yet wired up as the
+// repo's live container config. See README.md in this folder for the full
+// setup guide and for what "promoting" this file involves. If/when adopted,
+// this file (and Dockerfile) should move to `.devcontainer/` at the repo
+// root so tooling finds it at the default location.
+//
+// Covers the whole polyglot workspace:
+//   - ptern-gleam       Gleam, JS target, runs on Bun (no Erlang/OTP needed)
+//   - ptern-typescript  TypeScript, built/tested with Bun
+//   - ptern-playground  Solid.js + Vite + Tailwind, Playwright E2E (Chromium)
+//   - ptern-kotlin      Kotlin/JVM via Gradle (Gradle wrapper fetches Gradle
+//                       itself and resolves Kotlin via the plugin portal —
+//                       only a JDK is needed in the image)
+{
+  "name": "ptern",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  "features": {
+    // JDK for ptern-kotlin. The Gradle wrapper (gradlew) downloads Gradle
+    // 9.5.1 itself on first use; this feature only needs to supply the JDK.
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "25",
+      "jdkDistro": "tem"
+    },
+    // A real (non-Bun-shimmed) Node.js binary. Not required to build or test
+    // anything here directly (Bun covers that), but it's cheap insurance
+    // against the `bunx`-spawns-a-node-CLI class of problem documented in
+    // ptern-playground/README.md ("WSL2 note — webServer auto-spawn hang") —
+    // see README.md's TBD section on whether that resurfaces in-container.
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
+
+  "remoteUser": "vscode",
+
+  // Named volumes so tool caches survive container rebuilds instead of
+  // re-downloading everything (Bun packages, Gradle/JVM dependencies,
+  // Playwright's Chromium download) every time the image changes.
+  "mounts": [
+    "source=ptern-bun-cache,target=/home/vscode/.bun/install/cache,type=volume",
+    "source=ptern-gradle-cache,target=/home/vscode/.gradle,type=volume",
+    "source=ptern-playwright-cache,target=/home/vscode/.cache/ms-playwright,type=volume"
+  ],
+
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": {
+      "label": "ptern-playground (vite dev)",
+      "onAutoForward": "notify"
+    }
+  },
+
+  // bun install (root workspace) wires up the ptern-typescript <-> ptern-playground
+  // workspace symlink; gleam deps download primes the Gleam package cache;
+  // gradlew --version forces the wrapper to fetch Gradle once up front rather
+  // than on your first `gradle test` run.
+  "postCreateCommand": "bun install && bunx playwright install chromium && (cd ptern-gleam && gleam deps download) && (cd ptern-kotlin && ./gradlew --version)",
+
+  // Hints WebStorm as the JetBrains backend to preselect when opening this
+  // dev container. See README.md's Kotlin/WebStorm caveat before relying on
+  // this for ptern-kotlin work.
+  "customizations": {
+    "jetbrains": {
+      "backend": "WebStorm"
+    }
+  }
+}
