@@ -13,6 +13,9 @@
 //   - ptern-kotlin      Kotlin/JVM via Gradle (Gradle wrapper fetches Gradle
 //                       itself and resolves Kotlin via the plugin portal —
 //                       only a JDK is needed in the image)
+//   - ptern-go          planned; not in the repo yet (see README.md)
+//   - ptern-rust        planned; not in the repo yet (see README.md)
+//   - ptern-python      planned; not in the repo yet (see README.md)
 {
   "name": "ptern",
   "build": {
@@ -33,6 +36,22 @@
     // see README.md's TBD section on whether that resurfaces in-container.
     "ghcr.io/devcontainers/features/node:1": {
       "version": "lts"
+    },
+
+    // Go, Rust, Python for the planned ptern-go / ptern-rust / ptern-python
+    // ports (none exist in the repo yet as of this writing). Left on
+    // "latest" rather than pinned — unlike Gleam/Bun/JDK above, there's no
+    // go.mod / Cargo.toml / pyproject.toml yet to pin a version against.
+    // Once a port lands, pin its language version here to match that file
+    // and drop this comment (see the "Where Claude can help" section).
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "latest"
     }
   },
 
@@ -44,7 +63,12 @@
   "mounts": [
     "source=ptern-bun-cache,target=/home/vscode/.bun/install/cache,type=volume",
     "source=ptern-gradle-cache,target=/home/vscode/.gradle,type=volume",
-    "source=ptern-playwright-cache,target=/home/vscode/.cache/ms-playwright,type=volume"
+    "source=ptern-playwright-cache,target=/home/vscode/.cache/ms-playwright,type=volume",
+    // Pre-declared for the planned Go/Rust/Python ports so the caches exist
+    // and persist from the day each toolchain is first used, same as above.
+    "source=ptern-go-cache,target=/home/vscode/go/pkg/mod,type=volume",
+    "source=ptern-cargo-cache,target=/home/vscode/.cargo/registry,type=volume",
+    "source=ptern-pip-cache,target=/home/vscode/.cache/pip,type=volume"
   ],
 
   "forwardPorts": [5173],
@@ -59,6 +83,12 @@
   // workspace symlink; gleam deps download primes the Gleam package cache;
   // gradlew --version forces the wrapper to fetch Gradle once up front rather
   // than on your first `gradle test` run.
+  //
+  // Add analogous priming once each new port exists, e.g.:
+  //   (cd ptern-go && go mod download)
+  //   (cd ptern-rust && cargo fetch)
+  //   (cd ptern-python && pip install -e .)   # or `uv sync`, per whatever
+  //                                           # ptern-python ends up using
   "postCreateCommand": "bun install && bunx playwright install chromium && (cd ptern-gleam && gleam deps download) && (cd ptern-kotlin && ./gradlew --version)",
 
   // Hints WebStorm as the JetBrains backend to preselect when opening this

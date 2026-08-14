@@ -1,10 +1,12 @@
 # Suggested dev container image for ptern.
 #
 # STATUS: proposal, living in documentation/ideas/ — see README.md in this
-# folder. JDK (for ptern-kotlin) and Node.js come from devcontainer.json
-# features instead of here; this Dockerfile only handles the two toolchains
-# that don't have a trustworthy official feature: Gleam and Bun, plus the
-# apt packages Playwright's Chromium needs at runtime.
+# folder. JDK (for ptern-kotlin), Node.js, and — for the planned but not-yet-
+# existing ptern-go/ptern-rust/ptern-python ports — Go, Rust, and Python all
+# come from devcontainer.json features instead of here; this Dockerfile only
+# handles the two toolchains that don't have a trustworthy official feature:
+# Gleam and Bun, plus the apt packages Playwright's Chromium needs at
+# runtime.
 
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 

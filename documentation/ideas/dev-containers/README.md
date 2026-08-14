@@ -14,44 +14,54 @@ untouched as a thin client; the desktop does the compiling.
 
 ```
  Windows laptop                                    Kubuntu desktop (LAN)
-┌─────────────────────────────┐   SSH            ┌───────────────────────────────┐
-│ WebStorm                     │ ───────────────► │ sshd                          │
-│  └─ Remote Development        │                  │ Docker Engine                 │
-│      (JetBrains Client,       │                  │  └─ ptern dev container       │
-│       talks to a backend       │◄────────────────┤      ├─ backend IDE process   │
-│       IDE that runs inside      │   IDE protocol  │      │  (WebStorm "backend")  │
-│       the container)            │  over the same  │      ├─ gleam, bun, JDK 25,   │
-│                                 │  SSH tunnel     │      │  Gradle wrapper,       │
-│ docker CLI (client only,       │                 │      │  Playwright/Chromium   │
-│  no local engine needed)       │                 │      └─ /workspaces/ptern     │
-│                                 │                 │          (repo clone, lives   │
-│ WSL2 (optional helper —        │                 │          on this machine)     │
-│  see "Where WSL2 fits in")     │                 │                                │
-└─────────────────────────────┘                  └───────────────────────────────┘
+┌───────────────────────────────┐                 ┌───────────────────────────────┐
+│ WebStorm                       │                 │ sshd                          │
+│  └─ Remote Development          │  IDE protocol   │ Docker Engine                 │
+│      (JetBrains Client,          │  over SSH,     │  └─ ptern dev container       │
+│       talks to a backend          │  relayed       │      ├─ backend IDE process   │
+│       IDE that runs inside         │  through WSL2 │      │  (WebStorm "backend")  │
+│       the container)                │◄─────────────┤      ├─ gleam, bun, JDK 25,   │
+│                                     │               │      │  Go, Rust, Python,     │
+│ WSL2                                │   SSH         │      │  Gradle wrapper,       │
+│  └─ docker CLI, active context ─────┼──────────────►│      │  Playwright/Chromium   │
+│      "ptern-devbox" → ssh://kubuntu │               │      └─ /workspaces/ptern     │
+│      (see "Where WSL2 fits in")      │              │          (repo clone, lives   │
+└───────────────────────────────┘                    │          on this machine)     │
+                                                       └───────────────────────────────┘
 ```
 
 The key mental model: WebStorm's "Dev Containers" feature is really two things glued
-together — (1) an SSH connection from the laptop to a machine that has a Docker daemon, and
+together — (1) a Docker connection from the laptop to a machine that has a Docker daemon, and
 (2) once there, a normal devcontainer.json build+attach, with a full IDE backend process
 running *inside* the container and a lightweight "JetBrains Client" on the laptop rendering
-its UI. Your keystrokes go over SSH; the compiling, indexing, and test-running all happen on
-the Kubuntu box.
+its UI. Your keystrokes go over that connection; the compiling, indexing, and test-running all
+happen on the Kubuntu box. What's specific to this setup: the Docker connection in (1) is
+provided by WSL2's `docker` CLI, itself pointed at the Kubuntu box over SSH via a Docker
+*context* — not by any Docker install on Windows itself. See [Part
+2](#part-2--windows-laptop-point-webstorms-docker-connection-at-wsl2) for why that's the shape
+and [TBD](#tbd) for the one thing about it that needs confirming hands-on.
 
 ## Why this shape, and where WSL2 fits in
 
 - **All the toolchains live in one place, once.** ptern is more polyglot than a first glance
-  at `CLAUDE.md` suggests: Gleam+Bun (`ptern-gleam`), TypeScript+Bun (`ptern-typescript`),
-  Solid.js+Vite+Tailwind+Playwright (`ptern-playground`), and Kotlin/JVM+Gradle
-  (`ptern-kotlin`). Installing and version-pinning all four toolchains on a Windows laptop
-  (even via WSL2) is real ongoing maintenance; doing it once in an image on a beefier desktop
-  is less work over time and gives you a disposable, reproducible environment.
+  at `CLAUDE.md` suggests, and getting more so: Gleam+Bun (`ptern-gleam`), TypeScript+Bun
+  (`ptern-typescript`), Solid.js+Vite+Tailwind+Playwright (`ptern-playground`), Kotlin/JVM+Gradle
+  (`ptern-kotlin`), and — planned, not yet in the repo — Go, Rust, and Python 3 ports. Installing
+  and version-pinning seven toolchains on a Windows laptop (even via WSL2) is real ongoing
+  maintenance; doing it once in an image on a beefier desktop is less work over time and gives
+  you a disposable, reproducible environment. It also means adding each new port later is a
+  `devcontainer.json`/`Dockerfile` edit, not a fresh round of laptop setup.
 - **Compute and disk.** A gaming/workstation-class Kubuntu desktop is presumably beefier than
-  the laptop — Gradle/JVM builds and a Chromium install both appreciate that.
-- **WSL2's role here is as a *helper on the laptop*, not the place work happens.** Two
-  concrete uses below: (a) `ssh-copy-id` to install your public key on the Kubuntu box,
-  because Windows' own OpenSSH client doesn't ship that tool; (b) a familiar shell for
-  ad-hoc `ssh`/`curl` poking while you get the connection working. It is deliberately **not**
-  where the container runs or where the repo is cloned.
+  the laptop — Gradle/JVM builds, a Rust `cargo build`, and a Chromium install all appreciate
+  that, and it's one machine's disk absorbing seven toolchains' worth of caches instead of the
+  laptop's.
+- **WSL2's role here is load-bearing, but narrow.** It is **not** where the container runs or
+  where the repo is cloned — that's still the Kubuntu box, for the compute/disk reasons above,
+  and to sidestep the WSL2 Playwright issue noted below. What it *is*: the one piece of Linux
+  userland on the laptop with a `docker` CLI already on it, which is exactly what WebStorm
+  needs to reach a Docker daemon it isn't running locally. Pointing WebStorm's Docker
+  connection at WSL2 (Part 2) means Windows itself never needs Docker installed at all — no
+  Docker Desktop, no native `docker.exe`.
 - **This also sidesteps a WSL2 issue you've already hit.** `ptern-playground/README.md`
   documents a WSL2-specific hang: Playwright's `webServer` auto-spawn deadlocks under `bunx`
   when there's no native Linux `node` binary on `PATH`, plus a handful of missing Chromium
@@ -68,14 +78,24 @@ Called out inline below where most relevant, and summarized here:
 - **Keeping the pinned versions current.** `Dockerfile` pins exact Gleam and Bun versions;
   `devcontainer.json` pins a JDK major version. Ask Claude to check these against
   `ptern-gleam/gleam.toml`, `ptern-gleam/manifest.toml`, `ptern-kotlin/build.gradle.kts`, and
-  upstream releases periodically, and bump them.
+  upstream releases periodically, and bump them. Once `ptern-go`/`ptern-rust`/`ptern-python`
+  exist, the same applies to their now-`"latest"` feature versions — ask Claude to pin those
+  to whatever `go.mod`/`Cargo.toml`/`pyproject.toml` each port ends up specifying.
 - **First-connection debugging.** SSH/Docker-context/Gateway-log failures during initial setup
   are exactly the kind of "read the error, check the obvious things, propose a fix" loop
-  Claude is good at — paste the error from WebStorm's connection log.
-- **A unifying task runner.** Three build tools (`bun`, `gleam`, `./gradlew`) means three
-  command vocabularies. If that friction is annoying in daily use, ask Claude to draft a root
-  `Justfile` or `Makefile` with common targets (`test`, `test-gleam`, `test-kotlin`,
-  `test-playground`, `dev`) — a good `documentation/ideas/` follow-up in its own right.
+  Claude is good at — paste the error from WebStorm's connection log or `docker context`
+  output.
+- **A unifying task runner.** Three build tools already (`bun`, `gleam`, `./gradlew`), with
+  `go`/`cargo`/`pytest` on the way, means an ever-growing set of command vocabularies. If that
+  friction is annoying in daily use, ask Claude to draft a root `Justfile` or `Makefile` with
+  common targets (`test`, `test-gleam`, `test-kotlin`, `test-playground`, `dev`) — a good
+  `documentation/ideas/` follow-up in its own right, and one worth waiting on until the new
+  ports actually land rather than guessing their command shapes now.
+- **Scaffolding each new port's devcontainer wiring.** When `ptern-go`/`ptern-rust`/
+  `ptern-python` actually land, ask Claude to update this guide's `devcontainer.json` in the
+  same PR/commit: pin the feature version, add the real `postCreateCommand` priming step, and
+  add its test command to [Day-to-day workflow](#day-to-day-workflow) — keeping the doc in
+  sync with the repo rather than drifting.
 - **Running inside the container.** If you install the `claude` CLI in the image too (see
   [TBD](#tbd)), Claude Code can act directly on the Kubuntu-side checkout, which is handy for
   anything that needs the full toolchain (running `gleam test` or `./gradlew test` itself)
@@ -130,67 +150,54 @@ mkdir -p ~/code && cd ~/code
 git clone <your-remote-url-for-ptern> ptern
 ```
 
-## Part 2 — Windows laptop: SSH key + Docker CLI
+## Part 2 — Windows laptop: point WebStorm's Docker connection at WSL2
 
-**SSH key**, generated on Windows so it's where the native Gateway app (a Windows process)
-will look for it:
+You already have a Docker CLI in WSL2 and specifically don't want one added to Windows itself
+(no Docker Desktop, no native `docker.exe`). That's compatible with this whole plan —
+JetBrains' Docker tooling has a first-class "WSL" connection type that shells out to a chosen
+WSL distro's own `docker` command rather than requiring one on Windows. All of the following
+happens in your WSL2 shell; nothing installs on the Windows side.
 
-```powershell
-ssh-keygen -t ed25519 -C "you@example.com (webstorm-gateway)"
-```
-
-Windows' built-in OpenSSH client doesn't ship `ssh-copy-id`. This is where WSL2 earns its
-keep — run the copy step from your WSL2 shell instead, pointed at the key you just generated
-on the Windows side:
+**SSH key**, generated in WSL2 (it's WSL2's `docker` CLI that will actually be dialing out to
+the Kubuntu box, so it needs its own trusted key — the Windows-native OpenSSH client is not
+part of this path):
 
 ```sh
-# from WSL2 — adjust the Windows username in the path
-ssh-copy-id -i /mnt/c/Users/<you>/.ssh/id_ed25519.pub <kubuntu-user>@<kubuntu-host>
+# in WSL2
+ssh-keygen -t ed25519 -C "you@example.com (wsl2-docker-relay)"
+ssh-copy-id <kubuntu-user>@<kubuntu-host>
+ssh <kubuntu-user>@<kubuntu-host>   # sanity check — should now log in with no password prompt
 ```
 
-Then verify from an actual Windows shell (PowerShell), since that's the client Gateway uses:
+**Docker context**, pointed at the Kubuntu box over that SSH connection, made the *default*
+context so any invocation of `docker` in this WSL distro — including a non-interactive one
+WebStorm makes on your behalf — uses it without needing extra flags or env vars:
 
-```powershell
-ssh <kubuntu-user>@<kubuntu-host>   # should log in with no password prompt
+```sh
+# still in WSL2
+docker context create ptern-devbox --docker "host=ssh://<kubuntu-user>@<kubuntu-host>"
+docker context use ptern-devbox
+docker version   # confirms it reached the *remote* daemon: look for a populated Server: section
 ```
 
-Optionally add a `Host` alias to `%USERPROFILE%\.ssh\config` for convenience:
+**In WebStorm** (native Windows app): **Settings → Build, Execution, Deployment → Docker → +**,
+choose connection type **WSL**, and pick the distro you just set up. Apply, then check the
+**Services** tool window's Docker section — it should show the Kubuntu box's containers/images
+(empty is fine at this point), confirming WebStorm is really reaching the remote engine through
+WSL2 and not a local one.
 
-```
-Host ptern-devbox
-    HostName <kubuntu-host-or-ip>
-    User <kubuntu-user>
-    IdentityFile ~/.ssh/id_ed25519
-```
-
-**Docker CLI** — JetBrains' own docs note that the *local* Docker CLI is required even for a
-remote-over-SSH dev container connection (it's used to establish the right build context), but
-you do **not** need a local Docker *engine* — Docker Desktop is more than this needs and keeps
-its own engine running in the background. Install just the CLI:
-
-```powershell
-winget install Docker.DockerCLI
-```
-
-`docker --version` should now work in PowerShell; `docker ps` will still fail with a
-"cannot connect to the Docker daemon" error until you point it somewhere — that's expected
-and fine, since WebStorm's own Dev Containers UI is what configures the SSH-based Docker
-connection (next section), not a manually-set `DOCKER_HOST`.
-
-If `winget install Docker.DockerCLI` isn't available on your Windows build, fall back to the
-static binary: download the zip for `x86_64` from
-`https://download.docker.com/win/static/stable/x86_64/`, extract `docker.exe` somewhere, and
-add that directory to `PATH`.
+Later, in the Dev Containers wizard (Part 3), you'll pick this same WSL-based connection
+instead of configuring a separate SSH-based one — one Docker connection, one hop through WSL2,
+one SSH leg from there to the Kubuntu box.
 
 ## Part 3 — First connection, in WebStorm
 
 1. Close any open project so you're on WebStorm's **Welcome Screen** (Dev Containers only
    shows up there, not while a project is open).
 2. **Remote Development → Dev Containers → New Dev Container**.
-3. Next to the Docker connection field, use the "⋮" menu to **connect to Docker on a remote
-   machine via SSH**. Point it at the `ptern-devbox` host (or user@host) from Part 2; if the
-   SSH connection itself isn't already registered with WebStorm, the same menu lets you add it
-   here.
+3. In the Docker connection field, select the **WSL**-type connection you configured in
+   Part 2 (it should already be registered from the Settings step, so it's just a dropdown
+   pick here — no new SSH setup in this dialog).
 4. Choose **existing sources** (not "from VCS") and give the path to the repo on the Kubuntu
    box: `/home/<kubuntu-user>/code/ptern`.
 5. For the devcontainer config path: while this file is still living under
@@ -242,6 +249,11 @@ bun run test:e2e         # from ptern-playground/
 
 # Kotlin
 cd ptern-kotlin && ./gradlew test
+
+# Go, Rust, Python — once each port exists (not in the repo yet)
+cd ptern-go && go test ./...
+cd ptern-rust && cargo test
+cd ptern-python && pytest
 ```
 
 The Vite dev server's port (5173) is auto-forwarded per `devcontainer.json`; WebStorm will
@@ -272,7 +284,21 @@ Open questions this document doesn't resolve:
 
 - **LAN addressing for the Kubuntu box.** Plain LAN IP, mDNS `.local` hostname, a static DHCP
   reservation, or a Tailscale/VPN hostname (useful if the laptop ever leaves the LAN, e.g.
-  working from elsewhere)? Affects the `HostName` in Part 2's SSH config.
+  working from elsewhere)? Affects `<kubuntu-host>` throughout Part 2's `ssh-copy-id` and
+  `docker context create` commands.
+- **Does WebStorm's Dev Containers wizard actually offer the WSL-type Docker connection, not
+  just the general Docker Settings page?** Part 2/3 assume the "WSL" connection type
+  registered under Settings → Docker is also selectable from the Dev Containers wizard's
+  connection dropdown — plausible (they appear to share the same connection registry) but not
+  hands-on verified. **Fallback if not:** a one-line `docker.cmd` on Windows `PATH` that shells
+  out to `wsl.exe -d <distro> -- docker %*` presents as a native `docker.exe` to anything that
+  needs one, without installing Docker Desktop or a real Windows Docker binary — the one
+  compromise that might be needed if the wizard insists on a native-looking executable. Try
+  the no-shim path first.
+- **Does the JetBrains Client ↔ backend-IDE protocol traffic itself also ride the WSL2→SSH
+  relay, or does Gateway open a second, separate connection to the Kubuntu box for that?** If
+  the latter, that second hop would need its own SSH trust from *somewhere* Windows-native can
+  reach — confirm on first connection; Part 2/3 as written assume it doesn't.
 - **Does the WSL2 `bunx`/Playwright `webServer` hang reproduce inside this container?**
   Untested. If it does, bake the workaround (`bun run dev` in one terminal, `test:e2e` in
   another) into a checked-in WebStorm run configuration rather than relying on memory.
@@ -287,6 +313,11 @@ Open questions this document doesn't resolve:
 - **Exact WebStorm menu wording.** Part 3's steps are current as of WebStorm 2026.2's public
   docs; JetBrains has moved this UI before and will again — sanity-check menu names against
   whatever version is actually installed the first time through.
-- **Unifying task runner** (`Justfile`/`Makefile` across `bun`/`gleam`/`gradlew`) — worth doing
-  at all, and if so, is it in scope for this document or a separate `documentation/ideas/`
-  proposal?
+- **Unifying task runner** (`Justfile`/`Makefile` across `bun`/`gleam`/`gradlew`, soon
+  `go`/`cargo`/`pytest`) — worth doing at all, and if so, is it in scope for this document or a
+  separate `documentation/ideas/` proposal?
+- **Go/Rust/Python toolchain specifics, once each port exists.** Exact language versions to
+  pin (left on feature default `"latest"` for now, deliberately — see
+  [Where Claude can help](#where-claude-can-help)); for Python specifically, which packaging
+  tool (`pip`, `poetry`, `uv`) — affects both the `python` feature's options and the
+  `postCreateCommand` priming step sketched in `devcontainer.json`.
